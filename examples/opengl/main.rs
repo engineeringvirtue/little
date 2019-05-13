@@ -1,7 +1,9 @@
+#![feature(const_int_conversion)]
+
 extern crate glutin;
 extern crate gl;
 
-extern crate little_renderer;
+extern crate little;
 
 use glutin::*;
 use gl::*;
@@ -10,8 +12,8 @@ use std::ffi::{CString, CStr, c_void};
 use std::ptr::null_mut;
 use std::mem;
 
-use little_renderer::*;
-use little_renderer::RGB;
+use little::*;
+use drawing::{*, RGB, RGBA};
 
 fn cstr(s: &str) -> CString {
     CString::new(s).unwrap()
@@ -93,6 +95,15 @@ impl Buffer<RGB> for TextureSurface {
         self.pixels[pos+1] = color.1;
         self.pixels[pos+2] = color.2;
     }
+}
+
+include_buffer!(Rainy, RGBA, "./assets/rainy.rc");
+
+fn render_surface(surface: &mut TextureSurface) {
+    surface.rect((0, 0), (128, 128), RGB(255, 255, 255));
+    surface.rect((30, 30), (128-30, 128-30), RGB(0, 255, 0));
+    surface.rect((50, 50), (128-50, 128-50), RGB(0, 0, 50));
+    surface.copy_mask((55, 55), (128-55, 128-55), &Rainy);
 }
 
 fn main() { unsafe {
@@ -192,20 +203,17 @@ void main()
 
     gl_err().unwrap();
 
+    let mut tex = mem::uninitialized();
+    GenTextures(1, &mut tex);
+    BindTexture(TEXTURE_2D, tex);
+
+    TexParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST as _);
+    TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST as _);
+
+    let mut surface = TextureSurface::new();
+
     loop {
-        BindBuffer(ARRAY_BUFFER, vbo);
-
-        let mut surface = TextureSurface::new();
-        surface.rect((0, 0), (128, 128), RGB(255, 255, 255));
-        surface.rect((30, 30), (128-30, 128-30), RGB(0, 255, 0));
-        surface.rect((50, 50), (128-50, 128-50), RGB(0, 0, 50));
-
-        let mut tex = mem::uninitialized();
-        GenTextures(1, &mut tex);
-        BindTexture(TEXTURE_2D, tex);
-
-        TexParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST as _);
-        TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST as _);
+        render_surface(&mut surface);
 
         TexImage2D(TEXTURE_2D, 0, gl::RGB8 as _, surface.width(), surface.height(), 0, gl::RGB, UNSIGNED_BYTE, surface.pixels.as_ptr() as *const c_void);
         
@@ -239,4 +247,5 @@ void main()
 
     DeleteBuffers(1, &vbo);
     DeleteVertexArrays(1, &vao);
+    gl_err().unwrap();
 } }

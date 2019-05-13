@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(const_int_conversion)]
 
 pub use core::mem;
 

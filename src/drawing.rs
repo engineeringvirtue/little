@@ -30,6 +30,12 @@ impl Mask for RGBA {
     }
 }
 
+impl Into<RGB> for RGBA {
+    fn into(self) -> RGB {
+        RGB(self.0, self.1, self.2)
+    }
+}
+
 pub trait Buffer<P: Pixel> {
     fn width(&self) -> i32;
     fn height(&self) -> i32;
@@ -46,11 +52,11 @@ macro_rules! include_buffer {
         impl $name {
             const BUFFER: &'static [u8] = include_bytes!($path);
             
-            const WIDTH: i32 = i32::from_le_bytes($name_BUFFER[0..4]);
-            const HEIGHT: i32 = i32::from_le_bytes($name_BUFFER[4..8]);
+            const WIDTH: i32 = i32::from_le_bytes([Self::BUFFER[0], Self::BUFFER[1], Self::BUFFER[2], Self::BUFFER[3]]);
+            const HEIGHT: i32 = i32::from_le_bytes([Self::BUFFER[4], Self::BUFFER[5], Self::BUFFER[6], Self::BUFFER[7]]);
             
             fn get_pos(x: i32, y: i32) -> usize {
-                8+(mem::size_of::<$format>()*(y*Self::WIDTH)*x)
+                8+(mem::size_of::<$format>()*((y*Self::WIDTH) as usize + x as usize))
             }
         }
 
@@ -65,8 +71,12 @@ macro_rules! include_buffer {
 
             fn get_pixel(&self, x: i32, y: i32) -> $format {
                 let pos = Self::get_pos(x, y);
+                
+                let mut buffer: [u8; mem::size_of::<$format>()] = unsafe { mem::uninitialized() };
+                buffer.copy_from_slice(&Self::BUFFER[pos..pos + mem::size_of::<$format>()]);
+
                 unsafe {
-                    mem::transmute_copy(Self::BUFFER[pos..pos + mem::size_of::<$format>()])
+                    mem::transmute(buffer)
                 }
             }
 
@@ -109,7 +119,11 @@ impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
         for _ in 0..len {
             for t in 0..thickness {
                 let offset_thickness = start_thickness + t;
-                self.set_pixel(x as i32 + offset_thickness, y as i32 + offset_thickness, color.clone());
+                let pos = (x as i32 + offset_thickness, y as i32 + offset_thickness);
+
+                if pos.0 >= 0 && pos.1 >= 0 && pos.0 <= self.width() && pos.1 <= self.height() {
+                    self.set_pixel(pos.0, pos.1, color.clone());
+                }
             }
 
             x += xstep;
@@ -131,8 +145,8 @@ impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
 
     fn copy_mask<BP: Mask + Into<P>, B: Buffer<BP>>(&mut self, from: Pos, to: Pos, buf: &B) {
         let length = (to.0 - from.0, to.1 - from.1);
-        let scale_factor = (length.0 as f32 / buf.width() as f32)
-            .min(length.1 as f32 / buf.height() as f32);
+        let scale_factor = (buf.width() as f32 / length.0 as f32)
+            .min(buf.height() as f32 / length.1 as f32);
         
         for y in from.1..to.1 {
             for x in from.0..to.0 {
