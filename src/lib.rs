@@ -3,18 +3,18 @@
 pub trait Pixel: Clone { }
 
 #[derive(Debug, Clone)]
-pub struct Greyscale(i16);
+pub struct Greyscale(pub i8);
 impl Pixel for Greyscale {}
 
 #[derive(Debug, Clone)]
-pub struct RGB(i16, i16, i16);
+pub struct RGB(pub i8, pub i8, pub i8);
 impl Pixel for RGB {}
 
 pub trait Buffer<P: Pixel> {
-    fn width() -> i32;
-    fn height() -> i32;
+    fn width(&self) -> i32;
+    fn height(&self) -> i32;
  
-    fn get_pixel(&self, x: i32, y: i32) -> &P;
+    fn get_pixel(&self, x: i32, y: i32) -> P;
     fn set_pixel(&mut self, x: i32, y: i32, p: P);
 }
 
