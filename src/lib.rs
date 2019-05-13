@@ -3,11 +3,11 @@
 pub trait Pixel: Clone { }
 
 #[derive(Debug, Clone)]
-pub struct Greyscale(pub i8);
+pub struct Greyscale(pub u8);
 impl Pixel for Greyscale {}
 
 #[derive(Debug, Clone)]
-pub struct RGB(pub i8, pub i8, pub i8);
+pub struct RGB(pub u8, pub u8, pub u8);
 impl Pixel for RGB {}
 
 pub trait Buffer<P: Pixel> {
@@ -60,8 +60,8 @@ impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
     }
 
     fn rect(&mut self, from: Pos, to: Pos, color: P) {
-        for y in to.0..to.1 {
-            for x in from.0..from.1 {
+        for y in from.1..to.1 {
+            for x in from.0..to.0 {
                 self.set_pixel(x, y, color.clone());
             }
         }
