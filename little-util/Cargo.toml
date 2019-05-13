@@ -1,0 +1,12 @@
+[package]
+name = "little-util"
+version = "0.1.0"
+authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
+readme = "README.md"
+
+[dependencies]
+clap = "2.33.0"
+error-chain = "0.12.1"
+
+lodepng = "2.4.2"
+little = {path="../"}

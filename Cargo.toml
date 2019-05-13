@@ -1,5 +1,5 @@
 [package]
-name = "little_renderer"
+name = "little"
 version = "0.1.0"
 authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
 edition = "2018"
