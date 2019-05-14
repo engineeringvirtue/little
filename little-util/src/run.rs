@@ -1,6 +1,5 @@
 use clap::*;
 use error::{Result, ResultExt};
-use std::io::{self, Write};
 
 use std::path;
 use std::fs;
@@ -20,6 +19,7 @@ pub fn run() -> Result<i32> {
 
     match matches.subcommand() {
         ("pack-image", Some(matches)) => {
+            println!("Reading...");
             let path = path::Path::new(matches.value_of("PATH").unwrap());
             let png = lodepng::decode32_file(path)?;
 
@@ -27,13 +27,14 @@ pub fn run() -> Result<i32> {
             let height: [u8; 4] = unsafe { mem::transmute(png.height as i32) };
             
             const PX_SIZE: usize = mem::size_of::<little::drawing::RGBA>();
+            println!("Encoding...");
             let mut img = vec![0; 8 + (png.width*png.height*PX_SIZE)];
             
-            for i in 0..3 {
+            for i in 0..4 {
                 img[i] = width[i];
             }
             
-            for i in 0..3 {
+            for i in 0..4 {
                 img[i+4] = height[i];
             }
 
@@ -50,6 +51,7 @@ pub fn run() -> Result<i32> {
 
             let path = path.with_extension("rc");
             fs::write(&path, img).chain_err(|| format!("Error writing to path {}", path.to_str().unwrap()))?;
+            println!("Finished!");
         },
         _ => ()
     }

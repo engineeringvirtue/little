@@ -1,5 +1,5 @@
 [package]
-name = "little-util"
+name = "little_util"
 version = "0.1.0"
 authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
 readme = "README.md"

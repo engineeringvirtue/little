@@ -8,7 +8,7 @@ pub trait Mask: Pixel {
 
 #[derive(Debug, Clone)]
 pub struct Greyscale(pub u8);
-impl Pixel for Greyscale {}
+impl Pixel for Greyscale { }
 
 impl Mask for Greyscale {
     fn order(&self) -> bool {
@@ -18,11 +18,11 @@ impl Mask for Greyscale {
 
 #[derive(Debug, Clone)]
 pub struct RGB(pub u8, pub u8, pub u8);
-impl Pixel for RGB {}
+impl Pixel for RGB { }
 
 #[derive(Debug, Clone)]
 pub struct RGBA(pub u8, pub u8, pub u8, pub u8);
-impl Pixel for RGBA {}
+impl Pixel for RGBA { }
 
 impl Mask for RGBA {
     fn order(&self) -> bool {
@@ -56,11 +56,11 @@ macro_rules! include_buffer {
             const HEIGHT: i32 = i32::from_le_bytes([Self::BUFFER[4], Self::BUFFER[5], Self::BUFFER[6], Self::BUFFER[7]]);
             
             fn get_pos(x: i32, y: i32) -> usize {
-                8+(mem::size_of::<$format>()*((y*Self::WIDTH) as usize + x as usize))
+                8+(std::mem::size_of::<$format>()*((y*Self::WIDTH) as usize + x as usize))
             }
         }
 
-        impl Buffer<$format> for $name {
+        impl little::drawing::Buffer<$format> for $name {
             fn width(&self) -> i32 {
                 Self::WIDTH
             }
@@ -70,6 +70,8 @@ macro_rules! include_buffer {
             }
 
             fn get_pixel(&self, x: i32, y: i32) -> $format {
+                use std::mem;
+
                 let pos = Self::get_pos(x, y);
                 
                 let mut buffer: [u8; mem::size_of::<$format>()] = unsafe { mem::uninitialized() };
@@ -93,6 +95,8 @@ pub trait Drawing<P: Pixel> {
     
     fn copy<B: Buffer<P>>(&mut self, from: Pos, to: Pos, buf: &B);
     fn copy_mask<BP: Mask + Into<P>, B: Buffer<BP>>(&mut self, from: Pos, to: Pos, buf: &B);
+
+    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> where Self: Sized;
 }
 
 impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
@@ -140,7 +144,18 @@ impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
     }
 
     fn copy<B: Buffer<P>>(&mut self, from: Pos, to: Pos, buf: &B) {
+        let length = (to.0 - from.0, to.1 - from.1);
+        let scale_factor = (buf.width() as f32 / length.0 as f32)
+            .min(buf.height() as f32 / length.1 as f32);
         
+        for y in from.1..to.1 {
+            for x in from.0..to.0 {
+                let px = buf.get_pixel(((x - from.0) as f32 * scale_factor) as i32,
+                    ((y - from.1) as f32 * scale_factor) as i32);
+                
+                self.set_pixel(x, y, px);
+            }
+        }
     }
 
     fn copy_mask<BP: Mask + Into<P>, B: Buffer<BP>>(&mut self, from: Pos, to: Pos, buf: &B) {
@@ -158,5 +173,34 @@ impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
                 }
             }
         }
+    }
+
+    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> where Self: Sized {
+        DrawRegion {
+            region, draw: self
+        }
+    }
+}
+
+pub struct DrawRegion<'a, 'b, T> {
+    pub draw: &'a mut T,
+    pub region: &'b Region
+}
+
+impl<'a, 'b, P: Pixel, T: Buffer<P>> Buffer<P> for DrawRegion<'a, 'b, T> {
+    fn width(&self) -> i32 {
+        self.region.to.0 - self.region.from.0
+    }
+
+    fn height(&self) -> i32 {
+        self.region.to.1 - self.region.from.1
+    }
+
+    fn get_pixel(&self, x: i32, y: i32) -> P {
+        self.draw.get_pixel(self.region.from.0 + x, self.region.from.1 + y)
+    }
+
+    fn set_pixel(&mut self, x: i32, y: i32, p: P) {
+        self.draw.set_pixel(self.region.from.0 + x, self.region.from.1 + y, p)
     }
 }

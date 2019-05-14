@@ -1,8 +1,9 @@
 [package]
-name = "little"
+name = "smartwatch"
 version = "0.1.0"
 authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
 edition = "2018"
 
 [dependencies]
-embedded-freetype-sys = "0.1.0"
+little = {path = "../"}
+little_opengl = {path = "../little-opengl"}
