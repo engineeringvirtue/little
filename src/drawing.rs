@@ -125,10 +125,10 @@ pub trait Drawing<P: Pixel, OP: Pixel + Into<P>> {
     fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>, thickness: i32);
     fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>);
 
-    fn flat_top_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>);
-    fn flat_bottom_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>);
-    fn triangle(&mut self, points: &mut [Pos; 3], color: ColorBlend<OP>);
-    fn poly(&mut self, points: &mut [Pos], color: ColorBlend<OP>);
+    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
+    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
+    fn triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
+    fn poly(&mut self, points: &[&Pos], color: ColorBlend<OP>);
     
     fn copy<B: Buffer<OP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
 
@@ -145,30 +145,39 @@ pub struct Interpolator<'a> {
     xlen: f32,
     ylen: f32,
     
-    swapped: bool
+    swapped: bool,
+    first: bool
+}
+
+impl<'a> Interpolator<'a> {
+    fn resolve(&self, pos: Pos) -> Pos {
+        if self.swapped {
+            Pos {x: pos.y, y: pos.x}
+        } else {
+            pos
+        }
+    }
 }
 
 impl<'a> core::iter::Iterator for Interpolator<'a> {
     type Item = Pos;
 
     fn next(&mut self) -> Option<Pos> {
-        if self.x != self.x2 {
-            let i = (self.x - self.x1) as f32 / self.xlen;
-            
-            let x = self.x;
-            let y = self.y1 + (i * self.ylen) as i32;
-            
+        if self.first {
+            self.first = false;
+
+            Some(self.resolve(pos(self.x, *self.y1)))
+        } else if self.x != self.x2 {
             if self.x2 > self.x {
                 self.x += 1;
             } else {
                 self.x -= 1;
             }
 
-            if self.swapped {
-                Some(pos(y, x))
-            } else {
-                Some(pos(x, y))
-            }
+            let i = (self.x - self.x1) as f32 / self.xlen;
+            let y = self.y1 + (i * self.ylen) as i32;
+            
+            Some(self.resolve(pos(self.x, y)))
         } else {
             None
         }
@@ -192,7 +201,8 @@ pub fn interpolate<'a>(mut x1: &'a i32, mut x2: &'a i32, mut y1: &'a i32, mut y2
         x: *x1, x2: *x2,
         xlen, ylen,
         x1, y1,
-        swapped
+        swapped,
+        first: true
     }
 }
 
@@ -245,66 +255,64 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
 
-    fn flat_top_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>) {
+    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>) {
         let mut left = interpolate(&points[2].x, &points[0].x, &points[2].y, &points[0].y);
         let mut right = interpolate(&points[2].x, &points[1].x, &points[2].y, &points[1].y);
 
         let mut next_y = points[2].y - 1;
 
         loop {
-            let (x1, y1) = loop {
+            let x1 = loop {
                 if let Some(Pos {x, y}) = left.next() {
                     if y <= next_y {
-                        break (x, y);
+                        break x;
                     }
                 } else {
                     return;
                 }
             };
 
-            let (x2, y2) = loop {
+            let x2 = loop {
                 if let Some(Pos {x, y}) = right.next() {
                     if y <= next_y {
-                        break (x, y);
+                        break x;
                     }
                 } else {
                     return;
                 }
             };
 
-            let y = y1.min(y2);
-
             if x2 > x1 {
-                self.rect(&pos(x1, y), &pos(x2, next_y+1), color);
+                self.rect(&pos(x1, next_y), &pos(x2, next_y+1), color);
             } else {
-                self.rect(&pos(x2, y), &pos(x1, next_y+1), color);
+                self.rect(&pos(x2, next_y), &pos(x1, next_y+1), color);
             }
 
-            next_y = y - 1;
+            next_y -= 1;
         }
     }
     
-    fn flat_bottom_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>) {
+    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>) {
         let mut left = interpolate(&points[0].x, &points[1].x, &points[0].y, &points[1].y);
         let mut right = interpolate(&points[0].x, &points[2].x, &points[0].y, &points[2].y);
 
         let mut next_y = points[0].y + 1;
 
         loop {
-            let (x1, y1) = loop {
+            let x1 = loop {
                 if let Some(Pos {x, y}) = left.next() {
                     if y >= next_y {
-                        break (x, y);
+                        break x;
                     }
                 } else {
                     return;
                 }
             };
 
-            let (x2, y2) = loop {
+            let x2 = loop {
                 if let Some(Pos {x, y}) = right.next() {
                     if y >= next_y {
-                        break (x, y);
+                        break x;
                     }
                 } else {
                     return;
@@ -321,28 +329,34 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
     
-    fn triangle(&mut self, points: &mut [Pos; 3], color: ColorBlend<OP>) {
+    fn triangle(&mut self, mut points: [&Pos; 3], color: ColorBlend<OP>) {
         points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
         if points[0].y == points[1].y {
-            self.flat_top_triangle(&points, color);
+            self.flat_top_triangle(points, color);
         } else if points[1].y == points[2].y {
-            self.flat_bottom_triangle(&points, color);
+            self.flat_bottom_triangle(points, color);
+        } else {
+            //hard math you can find it here http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
+            let mid = pos(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
+            
+            self.flat_bottom_triangle([points[0], points[1], &mid], color);
+            self.flat_top_triangle([points[1], &mid, points[2]], color);
         }
     }
 
-    fn poly(&mut self, points: &mut [Pos], color: ColorBlend<OP>) {
+    fn poly(&mut self, points: &[&Pos], color: ColorBlend<OP>) {
         for p1 in 0..points.len() {
             if p1 > 0 {
                 let p2 = points[p1 - 1];
                 
                 if let Some(p3) = points.get(p1+1) {
-                    self.triangle(&mut [points[p1], p2, *p3], color);
+                    self.triangle([&points[p1], &p2, p3], color);
                 } else {
-                    self.triangle(&mut [points[p1], points[0], p2], color);
+                    self.triangle([&points[p1], &points[0], p2], color);
                 }
             } else {
-                self.triangle(&mut [points[p1], *points.last().unwrap(), points[p1+1]], color);
+                self.triangle([&points[p1], points.last().unwrap(), &points[p1+1]], color);
             }
         }
     }
