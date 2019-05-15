@@ -15,9 +15,21 @@ pub fn run() -> Result<i32> {
                     .subcommand(SubCommand::with_name("pack-image")
                         .arg_from_usage("<PATH> 'Relative path to image'"))
 
+                    .subcommand(SubCommand::with_name("pack-font")
+                        .arg_from_usage("<PATH> 'Relative path to font'"))
+
                     .get_matches();
 
     match matches.subcommand() {
+        ("pack-font", Some(matches)) => {
+            use freetype::*;
+            
+            let path = path::Path::new(matches.value_of("PATH").unwrap());
+            
+            let lib = Library::init()?;
+            let face = lib.new_face(path, 0)?;
+            // face.set_char_size(char_width: isize, char_height: isize, horz_resolution: u32, vert_resolution: u32)
+        },
         ("pack-image", Some(matches)) => {
             println!("Reading...");
             let path = path::Path::new(matches.value_of("PATH").unwrap());

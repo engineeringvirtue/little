@@ -7,7 +7,7 @@
             "label": "build",
             "type": "shell",
             "command": "cargo",
-            "args": ["build", "--example", "opengl"],
+            "args": ["build", "smartwatch"],
             "problemMatcher": [
                 "$rustc"
             ]

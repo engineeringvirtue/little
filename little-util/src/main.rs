@@ -1,8 +1,9 @@
-extern crate little;
-
 #[macro_use]
 extern crate error_chain;
 extern crate clap;
+
+extern crate freetype;
+extern crate little;
 
 extern crate lodepng;
 

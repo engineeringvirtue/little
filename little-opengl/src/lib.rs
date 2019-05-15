@@ -87,7 +87,6 @@ impl Buffer<RGB> for TextureSurface {
 
 pub struct OpenGLPlatform {
     surface: TextureSurface,
-    input_state: input::InputState,
 
     glutin_ctx: WindowedContext<PossiblyCurrent>,
     event_loop: EventsLoop,
@@ -206,7 +205,6 @@ void main()
 
             OpenGLPlatform {
                 surface: TextureSurface::new(),
-                input_state: input::InputState::new(10),
                 
                 glutin_ctx: context, event_loop: ev,
                 program, tex_attrib, frag_s, vert_s, vbo, vao
@@ -216,10 +214,6 @@ void main()
 
     fn surface(&mut self) -> &mut TextureSurface {
         &mut self.surface
-    }
-
-    fn input_state(&self) -> &input::InputState {
-        &self.input_state
     }
 
     fn step(&mut self) -> bool {

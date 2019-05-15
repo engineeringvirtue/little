@@ -1,32 +1,54 @@
 use super::*;
 
-pub trait Pixel: Clone { }
+pub trait Pixel: Clone {
+    fn hard_blend(&self) -> bool {
+        true
+    }
 
-pub trait Mask: Pixel {
-    fn order(&self) -> bool;
+    fn soft_blend(&self) -> f32 {
+        1.0
+    }
+
+    fn choose(self, other: Self, t: f32) -> Self;
 }
 
-#[derive(Debug, Clone)]
-pub struct Greyscale(pub u8);
-impl Pixel for Greyscale { }
+impl Pixel for u8 {
+    fn hard_blend(&self) -> bool {
+        self > &126
+    }
 
-impl Mask for Greyscale {
-    fn order(&self) -> bool {
-        self.0 > 126
+    fn soft_blend(&self) -> f32 {
+        *self as f32/255.0
+    }
+
+    fn choose(self, other: Self, t: f32) -> Self {
+        ((self as f32 * t) + (other as f32 * (1.0 - t))) as u8
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RGB(pub u8, pub u8, pub u8);
-impl Pixel for RGB { }
+
+impl Pixel for RGB {
+    fn choose(self, other: Self, t: f32) -> Self {
+        RGB(self.0.choose(other.0, t), self.1.choose(other.1, t), self.2.choose(other.2, t))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct RGBA(pub u8, pub u8, pub u8, pub u8);
-impl Pixel for RGBA { }
 
-impl Mask for RGBA {
-    fn order(&self) -> bool {
-        self.3 > 126
+impl Pixel for RGBA {
+    fn hard_blend(&self) -> bool {
+        self.3.hard_blend()
+    }
+
+    fn soft_blend(&self) -> f32 {
+        self.3.soft_blend()
+    }
+
+    fn choose(self, other: Self, t: f32) -> Self {
+        RGBA(self.0.choose(other.0, t), self.1.choose(other.1, t), self.2.choose(other.2, t), self.3.choose(other.3, t))
     }
 }
 
@@ -34,6 +56,12 @@ impl Into<RGB> for RGBA {
     fn into(self) -> RGB {
         RGB(self.0, self.1, self.2)
     }
+}
+
+pub enum Blend {
+    Hard,
+    Soft,
+    Write
 }
 
 pub trait Buffer<P: Pixel> {
@@ -89,88 +117,247 @@ macro_rules! include_buffer {
     };
 }
 
-pub trait Drawing<P: Pixel> {
-    fn line(&mut self, from: Pos, to: Pos, color: P, thickness: i32);
-    fn rect(&mut self, from: Pos, to: Pos, color: P);
+pub type ColorBlend<'a,'b, P> = (&'a P, &'b Blend);
+
+pub trait Drawing<P: Pixel, OP: Pixel + Into<P>> {
+    fn blend(&mut self, x: i32, y: i32, cb: ColorBlend<OP>);
+
+    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>, thickness: i32);
+    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>);
+
+    fn flat_top_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>);
+    fn flat_bottom_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>);
+    fn triangle(&mut self, points: &mut [Pos; 3], color: ColorBlend<OP>);
+    fn poly(&mut self, points: &mut [Pos], color: ColorBlend<OP>);
     
-    fn copy<B: Buffer<P>>(&mut self, from: Pos, to: Pos, buf: &B);
-    fn copy_mask<BP: Mask + Into<P>, B: Buffer<BP>>(&mut self, from: Pos, to: Pos, buf: &B);
+    fn copy<B: Buffer<OP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
 
     fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> where Self: Sized;
 }
 
-impl<P: Pixel, S: Buffer<P>> Drawing<P> for S {
-    fn line(&mut self, from: Pos, to: Pos, color: P, thickness: i32) {
-        //get precision and step for each dimension        
-        let (len, xstep, ystep) = {
-            let xlen = (to.0 - from.0).abs();
-            let ylen = (to.1 - from.1).abs();
-        
+pub struct Interpolator<'a> {
+    x: i32,
+    x2: i32,
 
-            if xlen > ylen {
-                (xlen, 1.0, (ylen as f32 / xlen as f32))
+    x1: &'a i32,
+    y1: &'a i32,
+
+    xlen: f32,
+    ylen: f32,
+    
+    swapped: bool
+}
+
+impl<'a> core::iter::Iterator for Interpolator<'a> {
+    type Item = Pos;
+
+    fn next(&mut self) -> Option<Pos> {
+        if self.x != self.x2 {
+            let i = (self.x - self.x1) as f32 / self.xlen;
+            
+            let x = self.x;
+            let y = self.y1 + (i * self.ylen) as i32;
+            
+            if self.x2 > self.x {
+                self.x += 1;
             } else {
-                (ylen, (xlen as f32 / ylen as f32), 1.0)
-            }
-        };
-
-        //draw
-        let mut x = from.0 as f32;
-        let mut y = from.1 as f32;
-
-        let start_thickness = -(thickness / 2);
-
-        for _ in 0..len {
-            for t in 0..thickness {
-                let offset_thickness = start_thickness + t;
-                let pos = (x as i32 + offset_thickness, y as i32 + offset_thickness);
-
-                if pos.0 >= 0 && pos.1 >= 0 && pos.0 <= self.width() && pos.1 <= self.height() {
-                    self.set_pixel(pos.0, pos.1, color.clone());
-                }
+                self.x -= 1;
             }
 
-            x += xstep;
-            y += ystep;
+            if self.swapped {
+                Some(pos(y, x))
+            } else {
+                Some(pos(x, y))
+            }
+        } else {
+            None
         }
     }
+}
 
-    fn rect(&mut self, from: Pos, to: Pos, color: P) {
-        for y in from.1..to.1 {
-            for x in from.0..to.0 {
-                self.set_pixel(x, y, color.clone());
-            }
-        }
-    }
+pub fn interpolate<'a>(mut x1: &'a i32, mut x2: &'a i32, mut y1: &'a i32, mut y2: &'a i32) -> Interpolator<'a> {
+    let mut swapped = false;
 
-    fn copy<B: Buffer<P>>(&mut self, from: Pos, to: Pos, buf: &B) {
-        let length = (to.0 - from.0, to.1 - from.1);
-        let scale_factor = (buf.width() as f32 / length.0 as f32)
-            .min(buf.height() as f32 / length.1 as f32);
+    if (y2 - y1).abs() > (x2 - x1).abs() {
+        mem::swap(&mut x1, &mut y1);
+        mem::swap(&mut x2, &mut y2);
         
-        for y in from.1..to.1 {
-            for x in from.0..to.0 {
-                let px = buf.get_pixel(((x - from.0) as f32 * scale_factor) as i32,
-                    ((y - from.1) as f32 * scale_factor) as i32);
+        swapped = true;
+    }
+    
+    let xlen = (x2 - x1) as f32;
+    let ylen = (y2 - y1) as f32;
+
+    Interpolator {
+        x: *x1, x2: *x2,
+        xlen, ylen,
+        x1, y1,
+        swapped
+    }
+}
+
+impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
+    fn blend(&mut self, x: i32, y: i32, (color, blend): ColorBlend<OP>) {
+        match blend {
+            Blend::Hard => {
+                if color.hard_blend() {
+                    self.set_pixel(x, y, color.clone().into());
+                }
+            },
+            Blend::Soft => {
+                let t = color.soft_blend();
+                let px = color.clone().into().choose(self.get_pixel(x, y), t);
                 
                 self.set_pixel(x, y, px);
+            },
+            Blend::Write => {
+                self.set_pixel(x, y, color.clone().into());
             }
         }
     }
 
-    fn copy_mask<BP: Mask + Into<P>, B: Buffer<BP>>(&mut self, from: Pos, to: Pos, buf: &B) {
-        let length = (to.0 - from.0, to.1 - from.1);
-        let scale_factor = (buf.width() as f32 / length.0 as f32)
-            .min(buf.height() as f32 / length.1 as f32);
-        
-        for y in from.1..to.1 {
-            for x in from.0..to.0 {
-                let px = buf.get_pixel(((x - from.0) as f32 * scale_factor) as i32,
-                    ((y - from.1) as f32 * scale_factor) as i32);
-                
-                if px.order() {
-                    self.set_pixel(x, y, px.into());
+    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>, mut thickness: i32) {    
+        let start_thickness = -thickness;
+        thickness *= 2;
+
+        for Pos {x,y} in interpolate(&from.x, &to.x, &from.y, &to.y) {
+            for t in 0..thickness {
+                let offset_thickness = start_thickness + t;
+                let y_thick = y + offset_thickness;
+                let x_thick = x + offset_thickness;
+
+                if x_thick >= 0 && x_thick < self.width() {
+                    self.blend(x_thick, y, color);
                 }
+
+                if y_thick >= 0 && y_thick < self.height() {
+                    self.blend(x, y_thick, color);
+                }
+            }
+        }
+    }
+
+    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>) {
+        for y in from.y..to.y {
+            for x in from.x..to.x {
+                self.blend(x, y, color);
+            }
+        }
+    }
+
+    fn flat_top_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>) {
+        let mut left = interpolate(&points[2].x, &points[0].x, &points[2].y, &points[0].y);
+        let mut right = interpolate(&points[2].x, &points[1].x, &points[2].y, &points[1].y);
+
+        let mut next_y = points[2].y - 1;
+
+        loop {
+            let (x1, y1) = loop {
+                if let Some(Pos {x, y}) = left.next() {
+                    if y <= next_y {
+                        break (x, y);
+                    }
+                } else {
+                    return;
+                }
+            };
+
+            let (x2, y2) = loop {
+                if let Some(Pos {x, y}) = right.next() {
+                    if y <= next_y {
+                        break (x, y);
+                    }
+                } else {
+                    return;
+                }
+            };
+
+            let y = y1.min(y2);
+
+            if x2 > x1 {
+                self.rect(&pos(x1, y), &pos(x2, next_y+1), color);
+            } else {
+                self.rect(&pos(x2, y), &pos(x1, next_y+1), color);
+            }
+
+            next_y = y - 1;
+        }
+    }
+    
+    fn flat_bottom_triangle(&mut self, points: &[Pos; 3], color: ColorBlend<OP>) {
+        let mut left = interpolate(&points[0].x, &points[1].x, &points[0].y, &points[1].y);
+        let mut right = interpolate(&points[0].x, &points[2].x, &points[0].y, &points[2].y);
+
+        let mut next_y = points[0].y + 1;
+
+        loop {
+            let (x1, y1) = loop {
+                if let Some(Pos {x, y}) = left.next() {
+                    if y >= next_y {
+                        break (x, y);
+                    }
+                } else {
+                    return;
+                }
+            };
+
+            let (x2, y2) = loop {
+                if let Some(Pos {x, y}) = right.next() {
+                    if y >= next_y {
+                        break (x, y);
+                    }
+                } else {
+                    return;
+                }
+            };
+
+            if x2 > x1 {
+                self.rect(&pos(x1, next_y-1), &pos(x2, next_y), color);
+            } else {
+                self.rect(&pos(x2, next_y-1), &pos(x1, next_y), color);
+            }
+
+            next_y += 1;
+        }
+    }
+    
+    fn triangle(&mut self, points: &mut [Pos; 3], color: ColorBlend<OP>) {
+        points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
+
+        if points[0].y == points[1].y {
+            self.flat_top_triangle(&points, color);
+        } else if points[1].y == points[2].y {
+            self.flat_bottom_triangle(&points, color);
+        }
+    }
+
+    fn poly(&mut self, points: &mut [Pos], color: ColorBlend<OP>) {
+        for p1 in 0..points.len() {
+            if p1 > 0 {
+                let p2 = points[p1 - 1];
+                
+                if let Some(p3) = points.get(p1+1) {
+                    self.triangle(&mut [points[p1], p2, *p3], color);
+                } else {
+                    self.triangle(&mut [points[p1], points[0], p2], color);
+                }
+            } else {
+                self.triangle(&mut [points[p1], *points.last().unwrap(), points[p1+1]], color);
+            }
+        }
+    }
+
+    fn copy<B: Buffer<OP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend) {
+        let length = to - from;
+        let scale_factor = (buf.width() as f32 / length.x as f32)
+            .min(buf.height() as f32 / length.y as f32);
+        
+        for y in from.y..to.y {
+            for x in from.x..to.x {
+                let px = buf.get_pixel(((x - from.x) as f32 * scale_factor) as i32,
+                    ((y - from.y) as f32 * scale_factor) as i32);
+                
+                self.blend(x, y, (&px, blend))
             }
         }
     }
@@ -189,18 +376,18 @@ pub struct DrawRegion<'a, 'b, T> {
 
 impl<'a, 'b, P: Pixel, T: Buffer<P>> Buffer<P> for DrawRegion<'a, 'b, T> {
     fn width(&self) -> i32 {
-        self.region.to.0 - self.region.from.0
+        self.region.to.x - self.region.from.x
     }
 
     fn height(&self) -> i32 {
-        self.region.to.1 - self.region.from.1
+        self.region.to.y - self.region.from.y
     }
 
     fn get_pixel(&self, x: i32, y: i32) -> P {
-        self.draw.get_pixel(self.region.from.0 + x, self.region.from.1 + y)
+        self.draw.get_pixel(self.region.from.x + x, self.region.from.y + y)
     }
 
     fn set_pixel(&mut self, x: i32, y: i32, p: P) {
-        self.draw.set_pixel(self.region.from.0 + x, self.region.from.1 + y, p)
+        self.draw.set_pixel(self.region.from.x + x, self.region.from.y + y, p)
     }
 }

@@ -1,27 +1,27 @@
 use super::*;
 
-pub enum Gesture {
+pub enum TouchGesture {
     Tap(Pos),
     ScrollY(Pos, i32),
     ScrollX(Pos, i32)
 }
 
-pub struct InputState {
+pub struct TouchInputState {
     pub start: Option<Pos>,
     pub current: Option<Pos>,
-    gesture: Option<Gesture>,
+    gesture: Option<TouchGesture>,
 
     pub threshold: i32
 }
 
-impl InputState {
+impl TouchInputState {
     pub fn new(threshold: i32) -> Self {
-        InputState {
+        TouchInputState {
             start: None, current: None, gesture: None, threshold
         }
     }
 
-    fn set_gesture(&mut self, gesture: Gesture) {
+    fn set_gesture(&mut self, gesture: TouchGesture) {
         self.gesture = Some(gesture);
     }
 
@@ -38,25 +38,25 @@ impl InputState {
         self.current = Some(pos);
 
         if let (Some(current), Some(start)) = (&self.current, self.start) {
-            let diff = (current.0 - start.0, current.1 - start.1);
+            let diff = *current - start;
             
-            if diff.0.abs() > self.threshold {
-                self.set_gesture(Gesture::ScrollX(start, diff.0));
-            } else if diff.1.abs() > self.threshold {
-                self.set_gesture(Gesture::ScrollY(start, diff.1));
+            if diff.x.abs() > self.threshold {
+                self.set_gesture(TouchGesture::ScrollX(start, diff.x));
+            } else if diff.y.abs() > self.threshold {
+                self.set_gesture(TouchGesture::ScrollY(start, diff.y));
             }
         }
     }
 
     pub fn touch_up(&mut self) {
         if let (Some(current), None) = (self.current.take(), &self.gesture) {
-            self.set_gesture(Gesture::Tap(current));
+            self.set_gesture(TouchGesture::Tap(current));
         }
 
         self.start = None;
     }
 
-    pub fn get_gesture(&self) -> &Option<Gesture> {
+    pub fn get_gesture(&self) -> &Option<TouchGesture> {
         &self.gesture
     }
 }

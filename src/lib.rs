@@ -13,9 +13,7 @@ pub trait Platform<Surface: drawing::Buffer<drawing::RGB>> {
     fn init() -> Self;
     
     fn surface(&mut self) -> &mut Surface;
-    
-    fn input_state(&self) -> &input::InputState;
-    
+        
     fn step(&mut self) -> bool;
 
     fn stop(self);
