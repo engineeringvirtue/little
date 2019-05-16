@@ -5,5 +5,5 @@ authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
 edition = "2018"
 
 [dependencies]
-little = {path = "../"}
+little = {path = "../little"}
 little_opengl = {path = "../little-opengl"}

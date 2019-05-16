@@ -127,6 +127,12 @@ impl ToPixel<RGBA> for bool {
     }
 }
 
+impl ToPixel<RGBA> for u8 {
+    fn to_pixel(self) -> RGBA {
+        RGBA(self, self, self, self)
+    }
+}
+
 pub enum Blend {
     Hard,
     Soft,
@@ -185,12 +191,14 @@ macro_rules! include_buffer {
     };
 }
 
-pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,1234567890 ";
+pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz:;\"\'./?!@#$%^&*(),-=+1234567890 ";
 
 #[derive(Clone, Debug)]
 pub struct FontCharHeader {
     pub width: i32, pub height: i32,
     pub left: i32, pub top: i32,
+
+    pub pitch: i32,
     
     pub x_advance: f32
 }
@@ -222,8 +230,8 @@ impl StaticGlyphBuffer {
     const MAPPING: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
 
     fn get_pos(&self, x: i32, y: i32) -> (usize, u8) {
-        let i = ((y * self.width()) + x) as usize;
-        ((i/8), Self::MAPPING[i%8])
+        let i = ((y * self.header.pitch) + (x/8)) as usize;
+        (i, Self::MAPPING[(x%8) as usize])
     }
 }
 
@@ -294,6 +302,31 @@ impl FontBuffer for StaticFontBuffer {
         }
 
         None
+    }
+}
+
+pub struct DrawText<'a, F: FontBuffer> {
+    pub font_size: f32,
+    pub line_height: f32,
+
+    pub font: &'a F,
+    pub txt: &'a str
+}
+
+impl<'a, F: FontBuffer> DrawText<'a, F> {
+    pub fn new(font: &'a F, txt: &'a str) -> Self {
+        DrawText {
+            font_size: 1.0, line_height: 1.0,
+            font, txt
+        }
+    }
+
+    pub fn font_size(self, font_size: f32) -> Self {
+        DrawText {font_size, ..self}
+    }
+    
+    pub fn line_height(self, line_height: f32) -> Self {
+        DrawText {line_height, ..self}
     }
 }
 
@@ -471,12 +504,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
     fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>);
     
     fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
-}
-
-pub trait TextDrawing<P: Pixel, TP: ToPixel<P>, F: FontBuffer>: Drawing<P, TP> {
-    fn glyph(&mut self, x: &mut f32, y: f32, font_size: f32, glyph: F::Glyph, blend: ColorBlend<TP>);
-    fn text(&mut self, txt: &str, from: &Pos, font_size: f32, font: &F, blend: ColorBlend<TP>);
-    fn text_multiline(&mut self, txt: &str, from: &Pos, to: &Pos, font_size: f32, line_height: f32, font: &F, blend: ColorBlend<TP>);
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where bool: ToPixel<TP>;
 }
 
 impl<S: Buffer + Sized> DrawingConvert for S {
@@ -646,59 +674,56 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
     fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend) {
         let length = to - from;
-        let scale_factor = (buf.width() as f32 / length.x as f32)
-            .min(buf.height() as f32 / length.y as f32);
+
+        let scale_x = buf.width() as f32 / length.x as f32;
+        let scale_y = buf.height() as f32 / length.y as f32;
         
         for y in from.y..to.y {
             for x in from.x..to.x {
-                let px = buf.get_pixel(((x - from.x) as f32 * scale_factor) as i32,
-                    ((y - from.y) as f32 * scale_factor) as i32);
+                let px = buf.get_pixel(((x - from.x) as f32 * scale_x) as i32,
+                    ((y - from.y) as f32 * scale_y) as i32);
                 
                 self.blend(x, y, (&px, blend))
             }
         }
     }
-}
-
-impl<P: Pixel, TP: ToPixel<P>, S: Drawing<P, TP>, F: FontBuffer> TextDrawing<P, TP, F> for S where bool: drawing::ToPixel<TP> {
-    fn glyph(&mut self, x: &mut f32, y: f32, font_size: f32, glyph: F::Glyph, cb: ColorBlend<TP>) {
-        // let head = glyph.get_header();
-        // let from = pos(*x as i32 + (head.left as f32*font_size) as i32, y as i32 + (head.top as f32*font_size) as i32);
-        // let to = from + pos((head.width as f32*font_size) as i32, (head.height as f32*font_size) as i32);
-        
-        // self.copy(from, to, &glyph.with_color((cb.0, &Blend::Hard)), cb.1);
-
-        // *x += head.x_advance * font_size;
-    }
-
-    fn text(&mut self, txt: &str, from: &Pos, font_size: f32, font: &F, cb: ColorBlend<TP>) {
-        let mut iter = txt.chars().peekable();
+    
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where bool: ToPixel<TP> {
+        let mut iter = txt.txt.chars().peekable();
         
         let mut x = from.x as f32;
+        let mut y = from.y as f32;
         
         while let Some(c) = iter.next() {
+            if c == '\n' || x as i32 > to.x {
+                x = from.x as f32;
+                y += txt.line_height * txt.font_size * 48.0;
+
+                continue;
+            }
+
+            if y as i32 > to.y {
+                return;
+            }
+
             let kern_next = iter.peek();
 
-            let mut glyph: F::Glyph = font.get_char(c).unwrap();
-            
-            let (from, to) = {
-                let head = glyph.get_header();
-                
-                let from = pos(x as i32 + (head.left as f32*font_size) as i32, from.y + (head.top as f32*font_size) as i32);
-                let to = from + pos((head.width as f32*font_size) as i32, (head.height as f32*font_size) as i32);
-                
-                x += head.x_advance * font_size;
+            if let Some(mut glyph) = txt.font.get_char(c) { //warning: this will skip over chars that are not included in the font
+                let (from, to) = {
+                    let head = glyph.get_header();
+                    
+                    let from = pos(x as i32 + (head.left as f32*txt.font_size) as i32, y as i32 - ((head.height - head.top) as f32*txt.font_size) as i32);
+                    let to = pos(from.x + (head.width as f32*txt.font_size) as i32, y as i32);
+                    
+                    x += head.x_advance * txt.font_size;
 
-                (from, to)
-            };
-            
-            self.copy(from, to, &glyph.with_color((cb.0, &Blend::Hard)), cb.1);
+                    (from, to)
+                };
+                
+                self.copy(from, to, &glyph.with_color((color.0, &Blend::Hard)), color.1);
 
-            x += kern_next.and_then(|c2| font.get_kerning(c, *c2)).unwrap_or(0.0) * font_size;
+                x += kern_next.and_then(|c2| txt.font.get_kerning(c, *c2)).unwrap_or(0.0) * txt.font_size;
+            }
         }
-    }
-
-    fn text_multiline(&mut self, txt: &str, from: &Pos, to: &Pos, font_size: f32, line_height: f32, font: &F, blend: ColorBlend<TP>) {
-
     }
 }

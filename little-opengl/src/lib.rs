@@ -113,7 +113,7 @@ const VERTS: [f32; 24] = [
 
 impl Platform<TextureSurface> for OpenGLPlatform {
     fn init() -> Self {
-        let scale_factor = 4.0;
+        let scale_factor = 2.5;
 
         let ev = EventsLoop::new();
         let win = WindowBuilder::new()

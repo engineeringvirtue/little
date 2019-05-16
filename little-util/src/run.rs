@@ -22,14 +22,14 @@ pub fn run() -> Result<i32> {
                     .author(env!("CARGO_PKG_AUTHORS"))
                     .about("Utility program for little.")
                       
-                    .subcommand(SubCommand::with_name("pack-image")
-                        .arg_from_usage("<PATH> 'Relative path to image'"))
-                        .arg_from_usage("-h, --height [HEIGHT] 'Height of glyphs'")
-                        .arg_from_usage("-char [CHAR] 'Extra characters'")
-
                     .subcommand(SubCommand::with_name("pack-font")
-                        .arg_from_usage("<PATH> 'Relative path to font'"))
-                        .arg_from_usage("-rgb, 'Skip alpha channel'")
+                        .arg_from_usage("<PATH> 'Relative path to font'")
+                        .arg_from_usage("-h --height [HEIGHT] 'Height of glyphs'")
+                        .arg_from_usage("-c --char [CHAR] 'Extra characters'")) //TODO
+
+                    .subcommand(SubCommand::with_name("pack-image")
+                        .arg_from_usage("<PATH> 'Relative path to image'")
+                        .arg_from_usage("--rgb 'Skip alpha channel'"))
 
                     .get_matches();
 
@@ -71,10 +71,10 @@ pub fn run() -> Result<i32> {
                     left: glyph.bitmap_left(),
                     top: bmp.rows() - glyph.bitmap_top(),
 
+                    pitch: bmp.pitch().abs(),
+
                     x_advance: glyph.advance().x as f32 / 64.0
                 };
-
-                dbg!(&header);
 
                 unsafe {
                     buf.extend_from_slice(&mem::transmute::<char, [u8; 4]>(c));
@@ -107,7 +107,7 @@ pub fn run() -> Result<i32> {
         ("pack-image", Some(matches)) => {
             println!("Reading...");
             let path = path::Path::new(matches.value_of("PATH").unwrap());
-            let rgb = matches.is_present("-rgb");
+            let rgb = matches.is_present("--rgb");
             let png = lodepng::decode32_file(path)?;
             
             println!("Encoding...");

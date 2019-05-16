@@ -7,6 +7,10 @@ pub fn transmute<T>(b: &[u8]) -> T {
 #[derive(Debug, Clone, Copy)]
 pub struct Pos { pub x: i32, pub y: i32 }
 
+impl Pos {
+    pub const MAX: Self = Pos {x: i32::max_value(), y: i32::max_value()};
+}
+
 impl core::ops::Mul<Pos> for Pos {
     type Output = Pos;
     fn mul(self, rhs: Pos) -> Pos {

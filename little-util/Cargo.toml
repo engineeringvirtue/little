@@ -10,4 +10,4 @@ error-chain = "0.12.1"
 
 lodepng = "2.4.2"
 freetype-rs = "0.19.1"
-little = {path="../"}
+little = {path="../little"}

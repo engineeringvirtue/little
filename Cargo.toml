@@ -1,8 +1,2 @@
-[package]
-name = "little"
-version = "0.1.0"
-authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
-edition = "2018"
-
-[dependencies]
-embedded-freetype-sys = "0.1.0"
+[workspace]
+members = ["little", "little-opengl", "little-util", "smartwatch"]
