@@ -1,3 +1,9 @@
+use super::*;
+
+pub fn transmute<T>(b: &[u8]) -> T {
+    unsafe { ptr::read(b.as_ptr() as *const T) }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Pos { pub x: i32, pub y: i32 }
 
@@ -19,6 +25,13 @@ impl core::ops::Sub<Pos> for Pos {
     type Output = Pos;
     fn sub(self, rhs: Pos) -> Pos {
         Pos {x: self.x - rhs.x, y: self.y - rhs.y}
+    }
+}
+
+impl core::ops::Add<Pos> for Pos {
+    type Output = Pos;
+    fn add(self, rhs: Pos) -> Pos {
+        Pos {x: self.x + rhs.x, y: self.y + rhs.y}
     }
 }
 

@@ -12,6 +12,39 @@ pub trait Pixel: Clone {
     fn choose(self, other: Self, t: f32) -> Self;
 }
 
+//like Into, but for pixels to make type constraints shorter
+pub trait ToPixel<T: Pixel>: Pixel {
+    fn to_pixel(self) -> T;
+}
+
+impl<T: Pixel> ToPixel<T> for T {
+    fn to_pixel(self) -> Self {
+        self
+    }
+}
+
+impl Pixel for bool {
+    fn hard_blend(&self) -> bool {
+        *self
+    }
+
+    fn soft_blend(&self) -> f32 {
+        if *self {
+            1.0
+        } else {
+            0.0
+        }
+    }
+
+    fn choose(self, other: Self, t: f32) -> Self {
+        if t < 1.0 {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 impl Pixel for u8 {
     fn hard_blend(&self) -> bool {
         self > &126
@@ -52,9 +85,45 @@ impl Pixel for RGBA {
     }
 }
 
-impl Into<RGB> for RGBA {
-    fn into(self) -> RGB {
+//pixel conversions ahead
+
+impl ToPixel<bool> for u8 {
+    fn to_pixel(self) -> bool {
+        self > 126
+    }
+}
+
+impl ToPixel<RGB> for RGBA {
+    fn to_pixel(self) -> RGB {
         RGB(self.0, self.1, self.2)
+    }
+}
+
+impl ToPixel<u8> for bool {
+    fn to_pixel(self) -> u8 {
+        if self {
+            255u8
+        } else {
+            0u8
+        }
+    }
+}
+
+impl ToPixel<RGB> for u8 {
+    fn to_pixel(self) -> RGB {
+        RGB(self, self, self)
+    }
+}
+
+impl ToPixel<RGB> for bool {
+    fn to_pixel(self) -> RGB {
+        RGB(self.to_pixel(), self.to_pixel(), self.to_pixel())
+    }
+}
+
+impl ToPixel<RGBA> for bool {
+    fn to_pixel(self) -> RGBA {
+        RGBA(self.to_pixel(), self.to_pixel(), self.to_pixel(), self.to_pixel())
     }
 }
 
@@ -64,75 +133,177 @@ pub enum Blend {
     Write
 }
 
-pub trait Buffer<P: Pixel> {
+pub trait Buffer {
+    type Format: Pixel;
+
     fn width(&self) -> i32;
     fn height(&self) -> i32;
  
-    fn get_pixel(&self, x: i32, y: i32) -> P;
-    fn set_pixel(&mut self, x: i32, y: i32, p: P);
+    fn get_pixel(&self, x: i32, y: i32) -> Self::Format;
+}
+
+pub trait WriteBuffer: Buffer {
+    fn set_pixel(&mut self, x: i32, y: i32, p: Self::Format);
+}
+
+pub struct StaticBuffer<Format: Pixel> {
+    pub buf: &'static [u8],
+    pub format: core::marker::PhantomData<Format>
+}
+
+impl<F: Pixel> StaticBuffer<F> {
+    fn get_pos(&self, x: i32, y: i32) -> usize {
+        8+(mem::size_of::<F>()*((y*self.width()) as usize + x as usize))
+    }
+}
+
+impl<F: Pixel> Buffer for StaticBuffer<F> {
+    type Format = F;
+
+    fn width(&self) -> i32 {
+        transmute(&self.buf[0..3])
+    }
+
+    fn height(&self) -> i32 {
+        transmute(&self.buf[4..7])
+    }
+
+    fn get_pixel(&self, x: i32, y: i32) -> F {
+        let pos = self.get_pos(x, y);
+        transmute(&self.buf[pos..pos + mem::size_of::<F>()])
+    }
 }
 
 #[macro_export]
 macro_rules! include_buffer {
     ($name: ident, $format: tt, $path: tt) => {
-        struct $name;
-
-        impl $name {
-            const BUFFER: &'static [u8] = include_bytes!($path);
-            
-            const WIDTH: i32 = i32::from_le_bytes([Self::BUFFER[0], Self::BUFFER[1], Self::BUFFER[2], Self::BUFFER[3]]);
-            const HEIGHT: i32 = i32::from_le_bytes([Self::BUFFER[4], Self::BUFFER[5], Self::BUFFER[6], Self::BUFFER[7]]);
-            
-            fn get_pos(x: i32, y: i32) -> usize {
-                8+(std::mem::size_of::<$format>()*((y*Self::WIDTH) as usize + x as usize))
-            }
-        }
-
-        impl little::drawing::Buffer<$format> for $name {
-            fn width(&self) -> i32 {
-                Self::WIDTH
-            }
-
-            fn height(&self) -> i32 {
-                Self::HEIGHT
-            }
-
-            fn get_pixel(&self, x: i32, y: i32) -> $format {
-                use std::mem;
-
-                let pos = Self::get_pos(x, y);
-                
-                let mut buffer: [u8; mem::size_of::<$format>()] = unsafe { mem::uninitialized() };
-                buffer.copy_from_slice(&Self::BUFFER[pos..pos + mem::size_of::<$format>()]);
-
-                unsafe {
-                    mem::transmute(buffer)
-                }
-            }
-
-            fn set_pixel(&mut self, x: i32, y: i32, p: $format) {
-                ()
-            }
-        }
+        const $name: little::drawing::StaticBuffer<$format> =
+            little::drawing::StaticBuffer {
+                buf: include_bytes!($path),
+                format: core::marker::PhantomData
+            };
     };
 }
 
-pub type ColorBlend<'a,'b, P> = (&'a P, &'b Blend);
+pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPabcdefghijklmnop.,1234567890 ";
 
-pub trait Drawing<P: Pixel, OP: Pixel + Into<P>> {
-    fn blend(&mut self, x: i32, y: i32, cb: ColorBlend<OP>);
-
-    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>, thickness: i32);
-    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>);
-
-    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
-    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
-    fn triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>);
-    fn poly(&mut self, points: &[&Pos], color: ColorBlend<OP>);
+#[derive(Clone, Debug)]
+pub struct FontCharHeader {
+    pub width: i32, pub height: i32,
+    pub left: i32, pub top: i32,
     
-    fn copy<B: Buffer<OP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
+    pub x_advance: f32
+}
 
-    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> where Self: Sized;
+pub trait CharBuffer: Buffer<Format=bool> {
+    fn get_header(&self) -> &FontCharHeader;
+}
+
+pub trait FontBuffer {
+    type Glyph: CharBuffer;
+
+    fn get_char(&self, c: char) -> Option<Self::Glyph>;
+    fn get_kerning(&self, c1: char, c2: char) -> Option<f32>;
+}
+
+pub type FontCharKernPair = (char, char, f32);
+
+pub struct StaticFontBuffer {
+    pub buf: &'static [u8]
+}
+
+pub struct StaticGlyphBuffer {
+    pub header: FontCharHeader,
+    pub buf: &'static [u8],
+    pub pos: usize
+}
+
+impl StaticGlyphBuffer {
+    const MAPPING: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
+
+    fn get_pos(&self, x: i32, y: i32) -> (usize, u8) {
+        let i = (y * self.width() + x) as usize;
+        ((i/8), Self::MAPPING[i%8])
+    }
+}
+
+impl Buffer for StaticGlyphBuffer {
+    type Format = bool;
+
+    fn width(&self) -> i32 {
+        self.header.width
+    }
+
+    fn height(&self) -> i32 {
+        self.header.height
+    }
+
+    fn get_pixel(&self, x: i32, y: i32) -> bool {
+        let (pos, bit) = self.get_pos(x, y);
+        (self.buf[self.pos+pos] & bit).count_ones() == 1
+    }
+}
+
+impl CharBuffer for StaticGlyphBuffer {
+    fn get_header(&self) -> &FontCharHeader {
+        &self.header
+    }
+}
+
+impl StaticFontBuffer {
+    fn pair_len(&self) -> usize {
+        transmute::<u32>(&self.buf[0..mem::size_of::<u32>()]) as usize
+    }
+}
+
+impl FontBuffer for StaticFontBuffer {
+    type Glyph = StaticGlyphBuffer;
+
+    fn get_char(&self, c: char) -> Option<StaticGlyphBuffer> {
+        let mut pos = mem::size_of::<u32>() + (self.pair_len() * mem::size_of::<FontCharKernPair>());
+        
+        while pos < self.buf.len() {
+            let c2: char = transmute(&self.buf[pos..pos+mem::size_of::<char>()]);
+            pos += mem::size_of::<char>();
+
+            if c == c2 {
+                pos += mem::size_of::<u32>();
+                let header: FontCharHeader = transmute(&self.buf[pos..pos+mem::size_of::<FontCharHeader>()]);
+
+                return Some(StaticGlyphBuffer {
+                    header, buf: self.buf,
+                    pos: pos + mem::size_of::<FontCharHeader>()
+                });
+            } else {
+                pos += transmute::<u32>(&self.buf[pos..pos+mem::size_of::<u32>()]) as usize
+            }
+        }
+
+        None
+    }
+
+    fn get_kerning(&self, c1: char, c2: char) -> Option<f32> {
+        for i in 0..self.pair_len() {
+            let pos = i*mem::size_of::<FontCharKernPair>();
+            let pair: FontCharKernPair = transmute(&self.buf[pos..pos+mem::size_of::<FontCharKernPair>()]);
+
+            if pair.0 == c1 && pair.1 == c2 {
+                return Some(pair.2);
+            }
+        }
+
+        None
+    }
+}
+
+#[macro_export]
+macro_rules! include_font {
+    ($name: ident, $path: tt) => {
+        const $name: little::drawing::StaticFontBuffer =
+            little::drawing::StaticFontBuffer {
+                buf: include_bytes!($path)
+            };
+    };
 }
 
 pub struct Interpolator<'a> {
@@ -206,27 +377,138 @@ pub fn interpolate<'a>(mut x1: &'a i32, mut x2: &'a i32, mut y1: &'a i32, mut y2
     }
 }
 
-impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
-    fn blend(&mut self, x: i32, y: i32, (color, blend): ColorBlend<OP>) {
+pub type ColorBlend<'a,'b, P> = (&'a P, &'b Blend);
+
+//todo: closure that evaluates p
+fn blend_colors<P: Pixel, TP: ToPixel<P>>((color, blend): ColorBlend<P>, p: TP) -> P {
+    match blend {
+        Blend::Hard => {
+            if p.hard_blend() {
+                color.clone()
+            } else {
+                p.to_pixel()
+            }
+        },
+        Blend::Soft => {
+            let t = p.soft_blend();
+            color.clone().choose(p.to_pixel(), t)
+        },
+        Blend::Write => {
+            color.clone()
+        }
+    }
+}
+
+pub struct DrawRegion<'a, 'b, T> {
+    pub draw: &'a mut T,
+    pub region: &'b Region
+}
+
+pub struct DrawColor<'a, 'b, 'c, P: Pixel, T> {
+    pub draw: &'a mut T,
+    pub fill: ColorBlend<'b, 'c, P>
+}
+
+impl<'a, 'b, P: Pixel, T: Buffer<Format=P>> Buffer for DrawRegion<'a, 'b, T> {
+    type Format = P;
+
+    fn width(&self) -> i32 {
+        self.region.to.x - self.region.from.x
+    }
+
+    fn height(&self) -> i32 {
+        self.region.to.y - self.region.from.y
+    }
+
+    fn get_pixel(&self, x: i32, y: i32) -> P {
+        self.draw.get_pixel(self.region.from.x + x, self.region.from.y + y)
+    }
+}
+
+impl<'a, 'b, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawRegion<'a, 'b, T> {
+    fn set_pixel(&mut self, x: i32, y: i32, p: P) {
+        self.draw.set_pixel(self.region.from.x + x, self.region.from.y + y, p)
+    }
+}
+
+impl<'a, 'b, 'c, P: Pixel, TP: ToPixel<P>, T: Buffer<Format=TP>> Buffer for DrawColor<'a, 'b, 'c, P, T> {
+    type Format = P;
+
+    fn width(&self) -> i32 {
+        self.draw.width()
+    }
+
+    fn height(&self) -> i32 {
+        self.draw.height()
+    }
+
+    fn get_pixel(&self, x: i32, y: i32) -> P {
+        blend_colors(self.fill, self.draw.get_pixel(x, y))
+    }
+}
+
+impl<'a, 'b, 'c, P: ToPixel<TP>, TP: ToPixel<P>, T: Buffer<Format=TP> + WriteBuffer> WriteBuffer for DrawColor<'a, 'b, 'c, P, T> {
+    fn set_pixel(&mut self, x: i32, y: i32, p: P) {
+        self.draw.set_pixel(x, y, blend_colors(self.fill, p).to_pixel());
+    }
+}
+
+pub trait DrawingConvert: Sized {
+    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self>;
+    fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, color: ColorBlend<'b, 'c, C>) -> DrawColor<'a, 'b, 'c, C, Self>;
+}
+
+pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
+    fn blend(&mut self, x: i32, y: i32, cb: ColorBlend<TP>);
+
+    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>, thickness: i32);
+    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>);
+
+    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
+    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
+    fn triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
+    fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>);
+    
+    fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
+}
+
+pub trait TextDrawing<P: Pixel, TP: ToPixel<P>, F: FontBuffer>: Drawing<P, TP> {
+    fn glyph(&mut self, x: &mut f32, y: f32, font_size: f32, glyph: F::Glyph, blend: ColorBlend<TP>);
+    fn text(&mut self, txt: &str, from: &Pos, font_size: f32, font: &F, blend: ColorBlend<TP>);
+    fn text_multiline(&mut self, txt: &str, from: &Pos, to: &Pos, font_size: f32, line_height: f32, font: &F, blend: ColorBlend<TP>);
+}
+
+impl<S: Buffer + Sized> DrawingConvert for S {
+    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> {
+        DrawRegion { region, draw: self }
+    }
+
+    fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, fill: ColorBlend<'b, 'c, C>) -> DrawColor<'a, 'b, 'c, C, Self> {
+        DrawColor { fill, draw: self }
+    }
+}
+
+impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {
+    fn blend(&mut self, x: i32, y: i32, (color, blend): ColorBlend<TP>) {
         match blend {
             Blend::Hard => {
                 if color.hard_blend() {
-                    self.set_pixel(x, y, color.clone().into());
+                    self.set_pixel(x, y, color.clone().to_pixel());
                 }
             },
             Blend::Soft => {
                 let t = color.soft_blend();
-                let px = color.clone().into().choose(self.get_pixel(x, y), t);
+                let px = color.clone().to_pixel().choose(self.get_pixel(x, y), t);
                 
                 self.set_pixel(x, y, px);
             },
             Blend::Write => {
-                self.set_pixel(x, y, color.clone().into());
+                self.set_pixel(x, y, color.clone().to_pixel());
             }
         }
     }
 
-    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>, mut thickness: i32) {    
+    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>, mut thickness: i32) {    
         let start_thickness = -thickness;
         thickness *= 2;
 
@@ -247,7 +529,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
 
-    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<OP>) {
+    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>) {
         for y in from.y..to.y {
             for x in from.x..to.x {
                 self.blend(x, y, color);
@@ -255,7 +537,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
 
-    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>) {
+    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>) {
         let mut left = interpolate(&points[2].x, &points[0].x, &points[2].y, &points[0].y);
         let mut right = interpolate(&points[2].x, &points[1].x, &points[2].y, &points[1].y);
 
@@ -292,7 +574,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
     
-    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<OP>) {
+    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>) {
         let mut left = interpolate(&points[0].x, &points[1].x, &points[0].y, &points[1].y);
         let mut right = interpolate(&points[0].x, &points[2].x, &points[0].y, &points[2].y);
 
@@ -329,7 +611,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
     
-    fn triangle(&mut self, mut points: [&Pos; 3], color: ColorBlend<OP>) {
+    fn triangle(&mut self, mut points: [&Pos; 3], color: ColorBlend<TP>) {
         points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
         if points[0].y == points[1].y {
@@ -345,7 +627,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
 
-    fn poly(&mut self, points: &[&Pos], color: ColorBlend<OP>) {
+    fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>) {
         for p1 in 0..points.len() {
             if p1 > 0 {
                 let p2 = points[p1 - 1];
@@ -361,7 +643,7 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
         }
     }
 
-    fn copy<B: Buffer<OP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend) {
+    fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend) {
         let length = to - from;
         let scale_factor = (buf.width() as f32 / length.x as f32)
             .min(buf.height() as f32 / length.y as f32);
@@ -375,33 +657,47 @@ impl<P: Pixel, S: Buffer<P>, OP: Pixel + Into<P>> Drawing<P, OP> for S {
             }
         }
     }
+}
 
-    fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> where Self: Sized {
-        DrawRegion {
-            region, draw: self
+impl<P: Pixel, TP: ToPixel<P>, S: Drawing<P, TP>, F: FontBuffer> TextDrawing<P, TP, F> for S where bool: drawing::ToPixel<TP> {
+    fn glyph(&mut self, x: &mut f32, y: f32, font_size: f32, glyph: F::Glyph, cb: ColorBlend<TP>) {
+        // let head = glyph.get_header();
+        // let from = pos(*x as i32 + (head.left as f32*font_size) as i32, y as i32 + (head.top as f32*font_size) as i32);
+        // let to = from + pos((head.width as f32*font_size) as i32, (head.height as f32*font_size) as i32);
+        
+        // self.copy(from, to, &glyph.with_color((cb.0, &Blend::Hard)), cb.1);
+
+        // *x += head.x_advance * font_size;
+    }
+
+    fn text(&mut self, txt: &str, from: &Pos, font_size: f32, font: &F, cb: ColorBlend<TP>) {
+        let mut iter = txt.chars().peekable();
+        
+        let mut x = from.x as f32;
+        
+        while let Some(c) = iter.next() {
+            let kern_next = iter.peek();
+
+            let mut glyph: F::Glyph = font.get_char(c).unwrap();
+            
+            let (from, to) = {
+                let head = glyph.get_header();
+                
+                let from = pos(x as i32 + (head.left as f32*font_size) as i32, from.y + (head.top as f32*font_size) as i32);
+                let to = from + pos((head.width as f32*font_size) as i32, (head.height as f32*font_size) as i32);
+                
+                x += head.x_advance * font_size;
+
+                (from, to)
+            };
+            
+            self.copy(from, to, &glyph.with_color((cb.0, &Blend::Hard)), cb.1);
+
+            x += kern_next.and_then(|c2| font.get_kerning(c, *c2)).unwrap_or(0.0) * font_size;
         }
     }
-}
 
-pub struct DrawRegion<'a, 'b, T> {
-    pub draw: &'a mut T,
-    pub region: &'b Region
-}
+    fn text_multiline(&mut self, txt: &str, from: &Pos, to: &Pos, font_size: f32, line_height: f32, font: &F, blend: ColorBlend<TP>) {
 
-impl<'a, 'b, P: Pixel, T: Buffer<P>> Buffer<P> for DrawRegion<'a, 'b, T> {
-    fn width(&self) -> i32 {
-        self.region.to.x - self.region.from.x
-    }
-
-    fn height(&self) -> i32 {
-        self.region.to.y - self.region.from.y
-    }
-
-    fn get_pixel(&self, x: i32, y: i32) -> P {
-        self.draw.get_pixel(self.region.from.x + x, self.region.from.y + y)
-    }
-
-    fn set_pixel(&mut self, x: i32, y: i32, p: P) {
-        self.draw.set_pixel(self.region.from.x + x, self.region.from.y + y, p)
     }
 }

@@ -62,7 +62,9 @@ impl TextureSurface {
     }
 }
 
-impl Buffer<RGB> for TextureSurface {
+impl Buffer for TextureSurface {
+    type Format = RGB;
+
     fn width(&self) -> i32 {
         WIDTH
     }
@@ -75,7 +77,9 @@ impl Buffer<RGB> for TextureSurface {
         let pos = ((y * WIDTH * 3) + (x * 3)) as usize;
         RGB(self.pixels[pos], self.pixels[pos + 1], self.pixels[pos + 2])
     }
+}
 
+impl WriteBuffer for TextureSurface {
     fn set_pixel(&mut self, x: i32, y: i32, color: RGB) {
         let pos = ((y * WIDTH * 3) + (x * 3)) as usize;
         
