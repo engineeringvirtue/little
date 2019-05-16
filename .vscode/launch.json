@@ -9,7 +9,7 @@
             "preLaunchTask": "build",
             "type": "gdb",
             "request": "launch",
-            "target": "${workspaceFolder}/smartwatch/target/debug/smartwatch.exe",
+            "target": "${workspaceFolder}/target/debug/smartwatch.exe",
             "cwd": "${workspaceFolder}",
             "env": {"RUST_BACKTRACE": "1"},
         }

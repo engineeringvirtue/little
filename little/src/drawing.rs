@@ -9,6 +9,7 @@ pub trait Pixel: Clone {
         1.0
     }
 
+    fn mult(self, t: f32) -> Self;
     fn choose(self, other: Self, t: f32) -> Self;
 }
 
@@ -36,6 +37,16 @@ impl Pixel for bool {
         }
     }
 
+    fn mult(self, t: f32) -> Self {
+        if t < 0.5 {
+            false
+        } else if t < 2.0 {
+            self
+        } else {
+            true
+        }
+    }
+
     fn choose(self, other: Self, t: f32) -> Self {
         if t < 1.0 {
             self
@@ -54,6 +65,10 @@ impl Pixel for u8 {
         *self as f32/255.0
     }
 
+    fn mult(self, t: f32) -> Self {
+        (self as f32 * t) as u8
+    }
+
     fn choose(self, other: Self, t: f32) -> Self {
         ((self as f32 * t) + (other as f32 * (1.0 - t))) as u8
     }
@@ -63,6 +78,10 @@ impl Pixel for u8 {
 pub struct RGB(pub u8, pub u8, pub u8);
 
 impl Pixel for RGB {
+    fn mult(self, t: f32) -> Self {
+        RGB(self.0.mult(t), self.1.mult(t), self.2.mult(t))
+    }
+
     fn choose(self, other: Self, t: f32) -> Self {
         RGB(self.0.choose(other.0, t), self.1.choose(other.1, t), self.2.choose(other.2, t))
     }
@@ -78,6 +97,10 @@ impl Pixel for RGBA {
 
     fn soft_blend(&self) -> f32 {
         self.3.soft_blend()
+    }
+
+    fn mult(self, t: f32) -> Self {
+        RGBA(self.0.mult(t), self.1.mult(t), self.2.mult(t), self.3.mult(t))
     }
 
     fn choose(self, other: Self, t: f32) -> Self {
@@ -192,18 +215,17 @@ macro_rules! include_buffer {
 }
 
 pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz:;\"\'./?!@#$%^&*(),-=+1234567890 ";
+pub const DEFAULT_LINE_HEIGHT: f32 = 32.0;
 
 #[derive(Clone, Debug)]
 pub struct FontCharHeader {
     pub width: i32, pub height: i32,
     pub left: i32, pub top: i32,
 
-    pub pitch: i32,
-    
     pub x_advance: f32
 }
 
-pub trait CharBuffer: Buffer<Format=bool> {
+pub trait CharBuffer: Buffer<Format=u8> {
     fn get_header(&self) -> &FontCharHeader;
 }
 
@@ -226,17 +248,8 @@ pub struct StaticGlyphBuffer {
     pub pos: usize
 }
 
-impl StaticGlyphBuffer {
-    const MAPPING: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
-
-    fn get_pos(&self, x: i32, y: i32) -> (usize, u8) {
-        let i = ((y * self.header.pitch) + (x/8)) as usize;
-        (i, Self::MAPPING[(x%8) as usize])
-    }
-}
-
 impl Buffer for StaticGlyphBuffer {
-    type Format = bool;
+    type Format = u8;
 
     fn width(&self) -> i32 {
         self.header.width
@@ -246,9 +259,8 @@ impl Buffer for StaticGlyphBuffer {
         self.header.height
     }
 
-    fn get_pixel(&self, x: i32, y: i32) -> bool {
-        let (pos, bit) = self.get_pos(x, y);
-        (self.buf[self.pos+pos] & bit).count_ones() == 1
+    fn get_pixel(&self, x: i32, y: i32) -> u8 {
+        self.buf[self.pos+((y * self.header.width) + x) as usize]
     }
 }
 
@@ -413,19 +425,18 @@ pub fn interpolate<'a>(mut x1: &'a i32, mut x2: &'a i32, mut y1: &'a i32, mut y2
 
 pub type ColorBlend<'a,'b, P> = (&'a P, &'b Blend);
 
-//todo: closure that evaluates p
-fn blend_colors<P: Pixel, TP: ToPixel<P>>((color, blend): ColorBlend<P>, p: TP) -> P {
+fn blend_source<P: Pixel, SP: Pixel, Source: FnOnce() -> SP>((color, blend): ColorBlend<P>, p: Source) -> P {
     match blend {
         Blend::Hard => {
-            if p.hard_blend() {
+            if p().hard_blend() {
                 color.clone()
             } else {
-                p.to_pixel()
+                color.clone().mult(0.0)
             }
         },
         Blend::Soft => {
-            let t = p.soft_blend();
-            color.clone().choose(p.to_pixel(), t)
+            let t = p().soft_blend();
+            color.clone().mult(t)
         },
         Blend::Write => {
             color.clone()
@@ -465,7 +476,7 @@ impl<'a, 'b, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawRe
     }
 }
 
-impl<'a, 'b, 'c, P: Pixel, TP: ToPixel<P>, T: Buffer<Format=TP>> Buffer for DrawColor<'a, 'b, 'c, P, T> {
+impl<'a, 'b, 'c, P: Pixel, SP: Pixel, T: Buffer<Format=SP>> Buffer for DrawColor<'a, 'b, 'c, P, T> {
     type Format = P;
 
     fn width(&self) -> i32 {
@@ -477,13 +488,13 @@ impl<'a, 'b, 'c, P: Pixel, TP: ToPixel<P>, T: Buffer<Format=TP>> Buffer for Draw
     }
 
     fn get_pixel(&self, x: i32, y: i32) -> P {
-        blend_colors(self.fill, self.draw.get_pixel(x, y))
+        blend_source(self.fill, || self.draw.get_pixel(x, y))
     }
 }
 
-impl<'a, 'b, 'c, P: ToPixel<TP>, TP: ToPixel<P>, T: Buffer<Format=TP> + WriteBuffer> WriteBuffer for DrawColor<'a, 'b, 'c, P, T> {
+impl<'a, 'b, 'c, P: ToPixel<SP>, SP: Pixel, T: Buffer<Format=SP> + WriteBuffer> WriteBuffer for DrawColor<'a, 'b, 'c, P, T> {
     fn set_pixel(&mut self, x: i32, y: i32, p: P) {
-        self.draw.set_pixel(x, y, blend_colors(self.fill, p).to_pixel());
+        self.draw.set_pixel(x, y, blend_source(self.fill, move || p).to_pixel());
     }
 }
 
@@ -504,7 +515,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
     fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>);
     
     fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where bool: ToPixel<TP>;
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where u8: ToPixel<TP>;
 }
 
 impl<S: Buffer + Sized> DrawingConvert for S {
@@ -688,7 +699,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where bool: ToPixel<TP> {
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where u8: ToPixel<TP> {
         let mut iter = txt.txt.chars().peekable();
         
         let mut x = from.x as f32;
@@ -697,7 +708,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         while let Some(c) = iter.next() {
             if c == '\n' || x as i32 > to.x {
                 x = from.x as f32;
-                y += txt.line_height * txt.font_size * 48.0;
+                y += txt.line_height * txt.font_size * DEFAULT_LINE_HEIGHT;
 
                 continue;
             }
@@ -712,7 +723,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                 let (from, to) = {
                     let head = glyph.get_header();
                     
-                    let from = pos(x as i32 + (head.left as f32*txt.font_size) as i32, y as i32 - ((head.height - head.top) as f32*txt.font_size) as i32);
+                    let from = pos((x + (head.left as f32*txt.font_size)) as i32, (y - ((head.height - head.top) as f32*txt.font_size)) as i32);
                     let to = pos(from.x + (head.width as f32*txt.font_size) as i32, y as i32);
                     
                     x += head.x_advance * txt.font_size;
@@ -720,7 +731,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                     (from, to)
                 };
                 
-                self.copy(from, to, &glyph.with_color((color.0, &Blend::Hard)), color.1);
+                self.copy(from, to, &glyph.with_color((color.0, &Blend::Soft)), color.1);
 
                 x += kern_next.and_then(|c2| txt.font.get_kerning(c, *c2)).unwrap_or(0.0) * txt.font_size;
             }

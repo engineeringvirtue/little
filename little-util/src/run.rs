@@ -8,11 +8,12 @@ use std::mem;
 
 use little::drawing::*;
 
-fn packfile(path: &path::Path, buf: Vec<u8>) -> Result<()> {
+fn packfile(path: &path::Path, buf: Vec<u8>) -> Result<usize> {
+    let l = buf.len();
     let path = path.with_extension("rc");
     fs::write(&path, buf).chain_err(|| format!("Error writing to path {}", path.to_str().unwrap()))?;
 
-    Ok(())
+    Ok(l)
 }
 
 /// CLI Runtime
@@ -40,7 +41,7 @@ pub fn run() -> Result<i32> {
             
             let path = path::Path::new(matches.value_of("PATH").unwrap());
             let height = matches.value_of("HEIGHT")
-                .and_then(|x| x.parse().ok()).unwrap_or(48);
+                .and_then(|x| x.parse().ok()).unwrap_or(DEFAULT_LINE_HEIGHT as u32);
             
             let lib = Library::init()?;
             let face = lib.new_face(path, 0)?;
@@ -51,7 +52,7 @@ pub fn run() -> Result<i32> {
             let mut pairs = Vec::new();
             for c in DEFAULT_CHARS.chars() {
                 println!("Rendering characters... {}", &c);
-                face.load_char(c as usize, face::LoadFlag::RENDER | face::LoadFlag::MONOCHROME)?;
+                face.load_char(c as usize, face::LoadFlag::RENDER)?;
 
                 let glyph = face.glyph();
                 let bmp = glyph.bitmap();
@@ -70,8 +71,6 @@ pub fn run() -> Result<i32> {
                     width: bmp.width(),
                     left: glyph.bitmap_left(),
                     top: bmp.rows() - glyph.bitmap_top(),
-
-                    pitch: bmp.pitch().abs(),
 
                     x_advance: glyph.advance().x as f32 / 64.0
                 };
@@ -101,8 +100,7 @@ pub fn run() -> Result<i32> {
 
             final_buf.append(&mut buf);
 
-            packfile(path, final_buf)?;
-            println!("Finished!");
+            println!("Finished! {} bytes", packfile(path, final_buf)?);
         },
         ("pack-image", Some(matches)) => {
             println!("Reading...");

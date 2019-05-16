@@ -28,7 +28,7 @@ fn main() {
         let points = [&pos(48, 10), &pos(128, 87), &pos(0, 110)];
 
         // surface.triangle(points, (&RGBA(0, 0, 0, 100), &Blend::Soft));
-        surface.text(&DrawText::new(&questrial, "10:10").font_size(0.6), &pos(0, 50), &pos(128,50), (&RGBA(0, 0, 0, 255), &Blend::Hard));
+        surface.text(&DrawText::new(&questrial, "10:10").font_size(1.3), &pos(10, 40), &pos(128,50), (&RGBA(0, 0, 0, 255), &Blend::Soft));
         
         // surface.line(&pos(30, 0), &pos(0, 128), (&RGBA(0, 0, 0, 100), &Blend::Soft), 5);
         
