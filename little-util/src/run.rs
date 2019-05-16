@@ -74,9 +74,11 @@ pub fn run() -> Result<i32> {
                     x_advance: glyph.advance().x as f32 / 64.0
                 };
 
+                dbg!(&header);
+
                 unsafe {
                     buf.extend_from_slice(&mem::transmute::<char, [u8; 4]>(c));
-                    buf.extend_from_slice(&mem::transmute::<u32, [u8; 4]>((mem::size_of::<FontCharHeader>() + bmp.buffer().len()) as u32));
+                    buf.extend_from_slice(&mem::transmute::<u32, [u8; 4]>((bmp.buffer().len()) as u32));
 
                     let header_bytes: [u8; mem::size_of::<FontCharHeader>()] = mem::transmute(header);
                     buf.extend_from_slice(&header_bytes);

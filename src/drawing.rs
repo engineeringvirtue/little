@@ -185,7 +185,7 @@ macro_rules! include_buffer {
     };
 }
 
-pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPabcdefghijklmnop.,1234567890 ";
+pub const DEFAULT_CHARS: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,1234567890 ";
 
 #[derive(Clone, Debug)]
 pub struct FontCharHeader {
@@ -222,7 +222,7 @@ impl StaticGlyphBuffer {
     const MAPPING: [u8; 8] = [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01];
 
     fn get_pos(&self, x: i32, y: i32) -> (usize, u8) {
-        let i = (y * self.width() + x) as usize;
+        let i = ((y * self.width()) + x) as usize;
         ((i/8), Self::MAPPING[i%8])
     }
 }
@@ -275,7 +275,8 @@ impl FontBuffer for StaticFontBuffer {
                     pos: pos + mem::size_of::<FontCharHeader>()
                 });
             } else {
-                pos += transmute::<u32>(&self.buf[pos..pos+mem::size_of::<u32>()]) as usize
+                let buf_size = transmute::<u32>(&self.buf[pos..pos+mem::size_of::<u32>()]) as usize;
+                pos += buf_size + mem::size_of::<u32>() + mem::size_of::<FontCharHeader>();
             }
         }
 

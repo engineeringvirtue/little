@@ -17,7 +17,6 @@ fn main() {
         let surface = platform.surface();
 
         let questrial = QUESTRIAL;
-        let a = questrial.get_char('A').unwrap();
 
         let rainy = RAINY;
 
@@ -28,7 +27,7 @@ fn main() {
         let points = [&pos(48, 10), &pos(128, 87), &pos(0, 110)];
 
         surface.triangle(points, (&RGBA(0, 0, 0, 100), &Blend::Soft));
-        surface.text("AAAA", &pos(0, 0), 1.0, &questrial, (&RGBA(0, 0, 0, 255), &Blend::Hard));
+        surface.text("ABCD", &pos(0, 0), 1.0, &questrial, (&RGBA(0, 0, 0, 255), &Blend::Hard));
         
         // surface.line(&pos(30, 0), &pos(0, 128), (&RGBA(0, 0, 0, 100), &Blend::Soft), 5);
         
