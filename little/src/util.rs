@@ -7,9 +7,8 @@ pub fn transmute<T>(b: &[u8]) -> T {
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2 { pub x: i32, pub y: i32 }
 
-impl Vector2 {
-    pub const MAX: Self = Vector2 {x: i32::max_value(), y: i32::max_value()};
-}
+#[derive(Debug, Clone, Copy)]
+pub struct Vector2f { pub x: f32, pub y: f32 }
 
 impl core::ops::Mul<Vector2> for Vector2 {
     type Output = Vector2;
@@ -39,14 +38,12 @@ impl core::ops::Add<Vector2> for Vector2 {
     }
 }
 
-impl From<(i32, i32)> for Vector2 {
-    fn from(x: (i32, i32)) -> Vector2 {
-        Vector2 {x: x.0, y: x.1}
-    }
-}
-
 pub fn vec2(x: i32, y: i32) -> Vector2 {
     Vector2 {x, y}
+}
+
+pub fn vec2f(x: f32, y: f32) -> Vector2f {
+    Vector2f {x, y}
 }
 
 pub struct Region {
@@ -62,5 +59,37 @@ impl Region {
     pub fn inside(&self, pos: Vector2) -> bool {
         pos.x >= self.from.x && pos.y >= self.from.y
             && pos.x <= self.to.x && pos.y <= self.to.y
+    }
+}
+
+pub fn fract(f: f32) -> f32 {
+    if f == 0.0 {
+        0.0
+    } else {
+        f % 1.0
+    }
+}
+
+pub fn floor(f: f32) -> f32 {
+    f - fract(f)
+}
+
+pub fn frac_ceil(f: f32, ff: f32) -> f32 {
+    if ff == 0.0 {
+        f
+    } else {
+        f + 1.0 - ff
+    }
+}
+
+pub fn ceil(f: f32) -> f32 {
+    frac_ceil(f, fract(f))
+}
+
+pub fn abs(f: f32) -> f32 {
+    if f < 0.0 {
+        -f
+    } else {
+        f
     }
 }
