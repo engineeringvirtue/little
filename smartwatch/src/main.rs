@@ -1,11 +1,10 @@
-#![feature(const_int_conversion)]
-
 extern crate little;
 extern crate little_opengl;
 
 use little::*;
+use little::input::*;
 use little::drawing::{RGB, RGBA, interpolate, Blend, Drawing, DrawText, FontBuffer, CharBuffer};
-use little::{Vector2, pos};
+use little::{Vector2, vec2};
 
 include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
 include_buffer!(EHEHE, RGBA, "../assets/ehehe.rc");
@@ -21,19 +20,19 @@ fn main() {
 
         let rainy = RAINY;
 
-        surface.rect(&pos(0, 0), &pos(128, 128), (&RGB(255, 255, 255), &Blend::Write));
-        // surface.rect(&pos(30, 30), &pos(128-30, 128-30), (&RGB(0, 255, 0), &Blend::Write));
+        surface.rect(&vec2(0, 0), &vec2(128, 128), (&RGB(255, 255, 255), &Blend::Write));
+        // surface.rect(&vec2(30, 30), &vec2(128-30, 128-30), (&RGB(0, 255, 0), &Blend::Write));
 
-        // surface.triangle([&pos(128, 0), &pos(128, 128), &pos(0, 0)], (&RGBA(0, 0, 0, 100), &Blend::Soft));
-        let points = [&pos(48, 10), &pos(128, 87), &pos(0, 110)];
+        // surface.triangle([&vec2(128, 0), &vec2(128, 128), &vec2(0, 0)], (&RGBA(0, 0, 0, 100), &Blend::Soft));
+        let points = [&vec2(48, 10), &vec2(128, 87), &vec2(0, 110)];
 
         // surface.triangle(points, (&RGBA(0, 0, 0, 100), &Blend::Soft));
-        surface.text(&DrawText::new(&questrial, "10:10").font_size(1.3), &pos(10, 40), &pos(128,50), (&RGBA(0, 0, 0, 255), &Blend::Soft));
+        surface.text(&DrawText::new(&questrial, "10:10").font_size(1.3), &vec2(10, 40), &vec2(128,50), (&RGBA(0, 0, 0, 255), &Blend::Soft));
         
-        // surface.line(&pos(30, 0), &pos(0, 128), (&RGBA(0, 0, 0, 100), &Blend::Soft), 5);
+        surface.line(&vec2(30, 0), &vec2(0, 127), (&RGBA(0, 0, 0, 100), &Blend::Soft), 5);
         
         // surface.rect((50, 50), (128-50, 128-50), RGB(0, 0, 50));
-        // surface.copy(pos(40, 55), pos(128-40, 128-55), &EHEHE, &Blend::Soft);
+        // surface.copy(vec2(40, 55), vec2(128-40, 128-55), &EHEHE, &Blend::Soft);
     }
 
     loop {

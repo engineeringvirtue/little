@@ -45,7 +45,7 @@ impl From<(i32, i32)> for Vector2 {
     }
 }
 
-pub fn pos(x: i32, y: i32) -> Vector2 {
+pub fn vec2(x: i32, y: i32) -> Vector2 {
     Vector2 {x, y}
 }
 

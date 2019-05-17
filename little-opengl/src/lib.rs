@@ -1,5 +1,3 @@
-#![feature(const_int_conversion)]
-
 extern crate glutin;
 extern crate gl;
 
@@ -15,6 +13,7 @@ use std::mem;
 
 use little::*;
 use drawing::{*, RGB};
+use input::*;
 
 fn cstr(s: &str) -> CString {
     CString::new(s).unwrap()
@@ -91,6 +90,10 @@ impl WriteBuffer for TextureSurface {
 
 pub struct OpenGLPlatform {
     surface: TextureSurface,
+    //emulate touch state
+    touch_state: TouchInputState,
+    mouse_pos: Vector2,
+    mouse_down: bool,
 
     glutin_ctx: WindowedContext<PossiblyCurrent>,
     event_loop: EventsLoop,
@@ -209,6 +212,9 @@ void main()
 
             OpenGLPlatform {
                 surface: TextureSurface::new(),
+
+                touch_state: TouchInputState::new(10),
+                mouse_pos: vec2(0,0), mouse_down: false,
                 
                 glutin_ctx: context, event_loop: ev,
                 program, tex_attrib, frag_s, vert_s, vbo, vao
@@ -232,10 +238,28 @@ void main()
         }
     
         let mut exit = false;
+        let (mouse_pos, mouse_down, touch_state) = (&mut self.mouse_pos, &mut self.mouse_down, &mut self.touch_state);
+
         self.event_loop.poll_events(|ev| {
             match ev {
-                Event::WindowEvent {event: WindowEvent::CloseRequested, ..} => {
-                    exit = true;
+                Event::WindowEvent {event: ev, ..} => {
+                    match ev {
+                        WindowEvent::CloseRequested => exit = true,
+                        WindowEvent::CursorMoved {position, ..} => {
+                            *mouse_pos = vec2(position.x as _, position.y as _);
+                            if *mouse_down {
+                                touch_state.touch_move(*mouse_pos);
+                            }
+                        },
+                        WindowEvent::MouseInput {state: ElementState::Pressed, ..} => {
+                            *mouse_down = true;
+                            touch_state.touch_down(*mouse_pos);
+                        },
+                        WindowEvent::MouseInput {state: ElementState::Released, ..} => {
+                            
+                        },
+                        _ => ()
+                    }
                 },
                 _ => ()
             }
@@ -260,5 +284,11 @@ void main()
             DeleteVertexArrays(1, &self.vao);
             gl_err().unwrap();
         }
+    }
+}
+
+impl TouchInput for OpenGLPlatform {
+    fn touch_step(&mut self) -> &TouchInputState {
+        &self.touch_state
     }
 }

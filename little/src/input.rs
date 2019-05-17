@@ -1,11 +1,14 @@
 use super::*;
 
+#[derive(Clone, Debug)]
 pub enum TouchGesture {
     Tap(Vector2),
     ScrollY(Vector2, i32),
     ScrollX(Vector2, i32)
 }
 
+
+#[derive(Clone, Debug)]
 pub struct TouchInputState {
     pub start: Option<Vector2>,
     pub current: Option<Vector2>,
@@ -21,7 +24,7 @@ impl TouchInputState {
         }
     }
 
-    fn set_gesture(&mut self, gesture: TouchGesture) {
+    pub fn set_gesture(&mut self, gesture: TouchGesture) {
         self.gesture = Some(gesture);
     }
 
@@ -59,4 +62,12 @@ impl TouchInputState {
     pub fn get_gesture(&self) -> &Option<TouchGesture> {
         &self.gesture
     }
+}
+
+pub trait TouchInput {
+    fn touch_step(&mut self) -> &TouchInputState;
+}
+
+pub trait DebugInput {
+    fn debug_step(&mut self) -> Option<usize>;
 }

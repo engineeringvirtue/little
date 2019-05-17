@@ -180,9 +180,13 @@ pub struct StaticBuffer<Format: Pixel> {
     pub format: core::marker::PhantomData<Format>
 }
 
+pub fn get_bufferi<B: Buffer>(b: &B, x: i32, y: i32) -> usize {
+    ((y*b.width()) + x) as usize
+}
+
 impl<F: Pixel> StaticBuffer<F> {
-    fn get_pos(&self, x: i32, y: i32) -> usize {
-        8+(mem::size_of::<F>()*((y*self.width()) as usize + x as usize))
+    fn get_vec2(&self, x: i32, y: i32) -> usize {
+        8+(mem::size_of::<F>()*get_bufferi(self, x, y))
     }
 }
 
@@ -198,7 +202,7 @@ impl<F: Pixel> Buffer for StaticBuffer<F> {
     }
 
     fn get_pixel(&self, x: i32, y: i32) -> F {
-        let pos = self.get_pos(x, y);
+        let pos = self.get_vec2(x, y);
         transmute(&self.buf[pos..pos + mem::size_of::<F>()])
     }
 }
@@ -211,6 +215,43 @@ macro_rules! include_buffer {
                 buf: include_bytes!($path),
                 format: core::marker::PhantomData
             };
+    };
+}
+
+#[macro_export]
+macro_rules! create_buffer {
+    ($name: ident, $width: tt, $height: tt, $format: tt) => {
+        struct $name {
+            data: [$format; $width * $height]
+        }
+
+        impl $name {
+            pub fn new() -> Self {
+                $name {data: [0; $width * $height]}
+            }
+        }
+
+        impl Buffer for $name {
+            type Format = $format;
+
+            fn width(&self) -> i32 {
+                $width
+            }
+
+            fn height(&self) -> i32 {
+                $height
+            }
+
+            fn get_pixel(&self, x: i32, y: i32) -> Self::Format {
+                self.data[get_bufferi(self, x, y)].clone()
+            }
+        }
+
+        impl WriteBuffer for Buffer {
+            fn set_pixel(x: i32, y: i32, p: Self::Format) {
+                self.data[get_bufferi(self, x, y)] = p;
+            }
+        }
     };
 }
 
@@ -260,7 +301,7 @@ impl Buffer for StaticGlyphBuffer {
     }
 
     fn get_pixel(&self, x: i32, y: i32) -> u8 {
-        self.buf[self.pos+((y * self.header.width) + x) as usize]
+        self.buf[self.pos+get_bufferi(self, x, y)]
     }
 }
 
@@ -383,7 +424,7 @@ impl<'a> core::iter::Iterator for Interpolator<'a> {
         if self.first {
             self.first = false;
 
-            Some(self.resolve(pos(self.x, *self.y1)))
+            Some(self.resolve(vec2(self.x, *self.y1)))
         } else if self.x != self.x2 {
             if self.x2 > self.x {
                 self.x += 1;
@@ -394,7 +435,7 @@ impl<'a> core::iter::Iterator for Interpolator<'a> {
             let i = (self.x - self.x1) as f32 / self.xlen;
             let y = self.y1 + (i * self.ylen) as i32;
             
-            Some(self.resolve(pos(self.x, y)))
+            Some(self.resolve(vec2(self.x, y)))
         } else {
             None
         }
@@ -605,9 +646,9 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             };
 
             if x2 > x1 {
-                self.rect(&pos(x1, next_y), &pos(x2, next_y+1), color);
+                self.rect(&vec2(x1, next_y), &vec2(x2, next_y+1), color);
             } else {
-                self.rect(&pos(x2, next_y), &pos(x1, next_y+1), color);
+                self.rect(&vec2(x2, next_y), &vec2(x1, next_y+1), color);
             }
 
             next_y -= 1;
@@ -642,9 +683,9 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             };
 
             if x2 > x1 {
-                self.rect(&pos(x1, next_y-1), &pos(x2, next_y), color);
+                self.rect(&vec2(x1, next_y-1), &vec2(x2, next_y), color);
             } else {
-                self.rect(&pos(x2, next_y-1), &pos(x1, next_y), color);
+                self.rect(&vec2(x2, next_y-1), &vec2(x1, next_y), color);
             }
 
             next_y += 1;
@@ -660,7 +701,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             self.flat_bottom_triangle(points, color);
         } else {
             //hard math you can find it here http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-            let mid = pos(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
+            let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
             
             self.flat_bottom_triangle([points[0], points[1], &mid], color);
             self.flat_top_triangle([points[1], &mid, points[2]], color);
@@ -723,8 +764,8 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                 let (from, to) = {
                     let head = glyph.get_header();
                     
-                    let from = pos((x + (head.left as f32*txt.font_size)) as i32, (y - ((head.height - head.top) as f32*txt.font_size)) as i32);
-                    let to = pos(from.x + (head.width as f32*txt.font_size) as i32, y as i32);
+                    let from = vec2((x + (head.left as f32*txt.font_size)) as i32, (y - ((head.height - head.top) as f32*txt.font_size)) as i32);
+                    let to = vec2(from.x + (head.width as f32*txt.font_size) as i32, y as i32);
                     
                     x += head.x_advance * txt.font_size;
 
