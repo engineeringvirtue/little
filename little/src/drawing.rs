@@ -367,9 +367,9 @@ pub struct Interpolator<'a> {
 }
 
 impl<'a> Interpolator<'a> {
-    fn resolve(&self, pos: Pos) -> Pos {
+    fn resolve(&self, pos: Vector2) -> Vector2 {
         if self.swapped {
-            Pos {x: pos.y, y: pos.x}
+            Vector2 {x: pos.y, y: pos.x}
         } else {
             pos
         }
@@ -377,9 +377,9 @@ impl<'a> Interpolator<'a> {
 }
 
 impl<'a> core::iter::Iterator for Interpolator<'a> {
-    type Item = Pos;
+    type Item = Vector2;
 
-    fn next(&mut self) -> Option<Pos> {
+    fn next(&mut self) -> Option<Vector2> {
         if self.first {
             self.first = false;
 
@@ -506,16 +506,16 @@ pub trait DrawingConvert: Sized {
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
     fn blend(&mut self, x: i32, y: i32, cb: ColorBlend<TP>);
 
-    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>, thickness: i32);
-    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>);
+    fn line(&mut self, from: &Vector2, to: &Vector2, color: ColorBlend<TP>, thickness: i32);
+    fn rect(&mut self, from: &Vector2, to: &Vector2, color: ColorBlend<TP>);
 
-    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
-    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
-    fn triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>);
-    fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>);
+    fn flat_top_triangle(&mut self, points: [&Vector2; 3], color: ColorBlend<TP>);
+    fn flat_bottom_triangle(&mut self, points: [&Vector2; 3], color: ColorBlend<TP>);
+    fn triangle(&mut self, points: [&Vector2; 3], color: ColorBlend<TP>);
+    fn poly(&mut self, points: &[&Vector2], color: ColorBlend<TP>);
     
-    fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend);
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where u8: ToPixel<TP>;
+    fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B, blend: &Blend);
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Vector2, to: &Vector2, color: ColorBlend<TP>) where u8: ToPixel<TP>;
 }
 
 impl<S: Buffer + Sized> DrawingConvert for S {
@@ -548,11 +548,11 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn line(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>, mut thickness: i32) {    
+    fn line(&mut self, from: &Vector2, to: &Vector2, color: ColorBlend<TP>, mut thickness: i32) {    
         let start_thickness = -thickness;
         thickness *= 2;
 
-        for Pos {x,y} in interpolate(&from.x, &to.x, &from.y, &to.y) {
+        for Vector2 {x,y} in interpolate(&from.x, &to.x, &from.y, &to.y) {
             for t in 0..thickness {
                 let offset_thickness = start_thickness + t;
                 let y_thick = y + offset_thickness;
@@ -569,7 +569,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn rect(&mut self, from: &Pos, to: &Pos, color: ColorBlend<TP>) {
+    fn rect(&mut self, from: &Vector2, to: &Vector2, color: ColorBlend<TP>) {
         for y in from.y..to.y {
             for x in from.x..to.x {
                 self.blend(x, y, color);
@@ -577,7 +577,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn flat_top_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>) {
+    fn flat_top_triangle(&mut self, points: [&Vector2; 3], color: ColorBlend<TP>) {
         let mut left = interpolate(&points[2].x, &points[0].x, &points[2].y, &points[0].y);
         let mut right = interpolate(&points[2].x, &points[1].x, &points[2].y, &points[1].y);
 
@@ -585,7 +585,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
         loop {
             let x1 = loop {
-                if let Some(Pos {x, y}) = left.next() {
+                if let Some(Vector2 {x, y}) = left.next() {
                     if y <= next_y {
                         break x;
                     }
@@ -595,7 +595,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             };
 
             let x2 = loop {
-                if let Some(Pos {x, y}) = right.next() {
+                if let Some(Vector2 {x, y}) = right.next() {
                     if y <= next_y {
                         break x;
                     }
@@ -614,7 +614,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn flat_bottom_triangle(&mut self, points: [&Pos; 3], color: ColorBlend<TP>) {
+    fn flat_bottom_triangle(&mut self, points: [&Vector2; 3], color: ColorBlend<TP>) {
         let mut left = interpolate(&points[0].x, &points[1].x, &points[0].y, &points[1].y);
         let mut right = interpolate(&points[0].x, &points[2].x, &points[0].y, &points[2].y);
 
@@ -622,7 +622,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
         loop {
             let x1 = loop {
-                if let Some(Pos {x, y}) = left.next() {
+                if let Some(Vector2 {x, y}) = left.next() {
                     if y >= next_y {
                         break x;
                     }
@@ -632,7 +632,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             };
 
             let x2 = loop {
-                if let Some(Pos {x, y}) = right.next() {
+                if let Some(Vector2 {x, y}) = right.next() {
                     if y >= next_y {
                         break x;
                     }
@@ -651,7 +651,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn triangle(&mut self, mut points: [&Pos; 3], color: ColorBlend<TP>) {
+    fn triangle(&mut self, mut points: [&Vector2; 3], color: ColorBlend<TP>) {
         points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
         if points[0].y == points[1].y {
@@ -667,7 +667,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn poly(&mut self, points: &[&Pos], color: ColorBlend<TP>) {
+    fn poly(&mut self, points: &[&Vector2], color: ColorBlend<TP>) {
         for p1 in 0..points.len() {
             if p1 > 0 {
                 let p2 = points[p1 - 1];
@@ -683,7 +683,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn copy<B: Buffer<Format=TP>>(&mut self, from: Pos, to: Pos, buf: &B, blend: &Blend) {
+    fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B, blend: &Blend) {
         let length = to - from;
 
         let scale_x = buf.width() as f32 / length.x as f32;
@@ -699,7 +699,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Pos, to: &Pos, color: ColorBlend<TP>) where u8: ToPixel<TP> {
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Vector2, to: &Vector2, color: ColorBlend<TP>) where u8: ToPixel<TP> {
         let mut iter = txt.txt.chars().peekable();
         
         let mut x = from.x as f32;

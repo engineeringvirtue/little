@@ -1,14 +1,14 @@
 use super::*;
 
 pub enum TouchGesture {
-    Tap(Pos),
-    ScrollY(Pos, i32),
-    ScrollX(Pos, i32)
+    Tap(Vector2),
+    ScrollY(Vector2, i32),
+    ScrollX(Vector2, i32)
 }
 
 pub struct TouchInputState {
-    pub start: Option<Pos>,
-    pub current: Option<Pos>,
+    pub start: Option<Vector2>,
+    pub current: Option<Vector2>,
     gesture: Option<TouchGesture>,
 
     pub threshold: i32
@@ -25,12 +25,12 @@ impl TouchInputState {
         self.gesture = Some(gesture);
     }
 
-    pub fn touch_down(&mut self, pos: Pos) {
+    pub fn touch_down(&mut self, pos: Vector2) {
         self.start = Some(pos);
         self.current = Some(pos);
     }
 
-    pub fn touch_move(&mut self, pos: Pos) {
+    pub fn touch_move(&mut self, pos: Vector2) {
         if let None = self.start {
             self.start = Some(pos);
         }

@@ -5,7 +5,7 @@ extern crate little_opengl;
 
 use little::*;
 use little::drawing::{RGB, RGBA, interpolate, Blend, Drawing, DrawText, FontBuffer, CharBuffer};
-use little::{Pos, pos};
+use little::{Vector2, pos};
 
 include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
 include_buffer!(EHEHE, RGBA, "../assets/ehehe.rc");
