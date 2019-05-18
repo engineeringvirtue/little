@@ -338,15 +338,51 @@ pub struct Interpolator {
     ylen: f32,
     
     swapped: bool,
-    first: bool
 }
 
 impl Interpolator {
-    fn resolve(&self, x: f32, y: f32) -> (f32, f32) {
+    pub fn resolve(&self, x: f32, y: f32) -> (f32, f32) {
         if self.swapped {
             (y, x)
         } else {
             (x, y)
+        }
+    }
+
+    pub fn get_co(&self) -> f32 {
+        let i = (self.x - self.x1) / self.xlen;
+        self.y1 + (i * self.ylen)
+    }
+
+    pub fn get_y_swap(&self) -> Option<f32> {
+        if self.swapped {
+            Some(self.x)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_x_swap(&self) -> Option<f32> {
+        if self.swapped {
+            None
+        } else {
+            Some(self.x)
+        }
+    }
+
+    pub fn get_y(&self) -> f32 {
+        if self.swapped {
+            self.x
+        } else {
+            self.get_co()
+        }
+    }
+
+    pub fn get_x(&self) -> f32 {
+        if self.swapped {
+            self.get_co()
+        } else {
+            self.x
         }
     }
 }
@@ -355,21 +391,16 @@ impl core::iter::Iterator for Interpolator {
     type Item = (f32, f32);
 
     fn next(&mut self) -> Option<(f32, f32)> {
-        if self.first {
-            self.first = false;
+        let x = self.resolve(self.x, self.get_co());
 
-            Some(self.resolve(self.x, self.y1))
-        } else if self.x != self.x2 {
+        if self.x != self.x2 {
             if self.x2 > self.x {
                 self.x += 1.0;
             } else {
                 self.x -= 1.0;
             }
-
-            let i = (self.x - self.x1) / self.xlen;
-            let y = self.y1 + (i * self.ylen);
             
-            Some(self.resolve(self.x, y))
+            Some(x)
         } else {
             None
         }
@@ -394,7 +425,6 @@ pub fn interpolate<'a>(mut x1: f32, mut x2: f32, mut y1: f32, mut y2: f32) -> In
         xlen, ylen,
         x1, y1,
         swapped,
-        first: true
     }
 }
 
@@ -542,56 +572,63 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
         fn flat_triangle<B: Buffer + WriteBuffer, TP: ToPixel<B::Format>>(b: &mut B, ult: &Vector2, left: &Vector2, right: &Vector2, color: &TP, top: bool) {
             //ignore the casts :^)
-            let (mut left, mut right) = (interpolate(ult.x as f32, left.x as f32, ult.y as f32, left.y as f32), interpolate(ult.x as f32, right.x as f32, ult.y as f32, right.y as f32));
-
             let step = if top { -1.0 } else { 1.0 };
-            let mut next_y = ult.y as f32 + step;
+            let (mut left, mut right) =
+                (interpolate(ult.x as f32, left.x as f32, ult.y as f32, left.y as f32 + step),
+                interpolate(ult.x as f32, right.x as f32, ult.y as f32, right.y as f32 + step));
+
+            let mut next_y = ult.y as f32;
 
             loop {
-                let (mut x1, y1) = loop {
-                    if let Some((x, y)) = left.next() {
-                        if (y >= next_y && top) || (y <= next_y && !top) {
-                            break (x, y);
-                        }
-                    } else {
-                        return;
-                    }
-                };
+                if !top {
+                    next_y += step;
+                }
 
-                let (mut x2, y2) = loop {
-                    if let Some((x, y)) = right.next() {
-                        if (y >= next_y && top) || (y <= next_y && !top) {
-                            break (x, y);
+                fn compare_y(y: f32, next_y: f32, top: bool) -> bool {
+                    (y < next_y && top) || (y > next_y && !top)
+                }
+
+                fn check_line_x(interp: &mut Interpolator, next_y: f32, top: bool) -> Option<f32> {
+                    if let Some(y) = interp.get_y_swap() {
+                        if compare_y(y, next_y, top) {
+                            return Some(interp.get_x());
                         }
-                    } else {
-                        return;
                     }
-                };
+                    
+                    loop {
+                        if let Some((x, y)) = interp.next() {
+                            if compare_y(y, next_y, top) {
+                                break Some(x);
+                            }
+                        } else {
+                            break None;
+                        }
+                    }
+                }
+
+                let (mut x1, mut x2) =
+                    match (check_line_x(&mut left, next_y, top), check_line_x(&mut right, next_y, top)) {
+                        (Some(x1), Some(x2)) => (x1 as i32, x2 as i32),
+                        _ => return
+                    };
 
                 if x2 < x1 {
                     mem::swap(&mut x1, &mut x2);
                 }
 
-                let x1f = fract(x1);
-                let x2f = fract(x2);
-
-                if (x2-x1) > 1.0 {
-                    b.antialiased_blend_frac(x1, x1f, y1, fract(y1), color.clone());
+                if (x2-x1) > 1 {
+                    b.antialiased_blend_frac(x1 as f32+0.9, 0.9, next_y, 0.0, color.clone());
                 }
                 
-                b.antialiased_blend_frac(x2, x2f, y2, fract(y2), color.clone());
+                b.antialiased_blend_frac(x2 as f32+0.4, 0.4, next_y, 0.0, color.clone());
 
-                let y = if top {
-                        y1.max(y2) as i32
-                    } else {
-                        y1.min(y2) as i32
-                    };
-
-                for x in (x1+1.0-x1f) as i32..(x2+x2f) as i32 {
-                    b.blend(x, y, color.clone());
+                for x in x1+2..x2 {
+                    b.blend(x, next_y as i32, color.clone());
                 }
-                
-                next_y += step;
+
+                if top {
+                    next_y += step;
+                }
             }
         }
 
@@ -604,7 +641,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
             
             flat_triangle(self, points[0], &mid, points[1], color, false);
-            // flat_triangle(self, points[1], &mid, points[2], color, true);
+            flat_triangle(self, points[2], &mid, points[1], color, true);
         }
     }
 
