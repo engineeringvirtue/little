@@ -7,3 +7,7 @@ edition = "2018"
 [dependencies]
 little = {path = "../little"}
 little_opengl = {path = "../little-opengl"}
+
+# for profiling - preserve debug symbols
+[profile.release]
+debug = true

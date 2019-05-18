@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn transmute<T>(b: &[u8]) -> T {
-    unsafe { ptr::read(b.as_ptr() as *const T) }
+    unsafe { core::ptr::read(b.as_ptr() as *const T) }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -59,37 +59,5 @@ impl Region {
     pub fn inside(&self, pos: Vector2) -> bool {
         pos.x >= self.from.x && pos.y >= self.from.y
             && pos.x <= self.to.x && pos.y <= self.to.y
-    }
-}
-
-pub fn fract(f: f32) -> f32 {
-    if f == 0.0 {
-        0.0
-    } else {
-        f % 1.0
-    }
-}
-
-pub fn floor(f: f32) -> f32 {
-    f - fract(f)
-}
-
-pub fn frac_ceil(f: f32, ff: f32) -> f32 {
-    if ff == 0.0 {
-        f
-    } else {
-        f + 1.0 - ff
-    }
-}
-
-pub fn ceil(f: f32) -> f32 {
-    frac_ceil(f, fract(f))
-}
-
-pub fn abs(f: f32) -> f32 {
-    if f < 0.0 {
-        -f
-    } else {
-        f
     }
 }

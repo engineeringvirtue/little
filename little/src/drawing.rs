@@ -1,4 +1,6 @@
 use super::*;
+use core::{mem, ptr, intrinsics::*};
+use util::transmute;
 
 pub trait Pixel: Clone {
     fn soft(&self) -> bool;
@@ -36,7 +38,7 @@ impl Pixel for u8 {
     }
 
     fn choose(self, other: Self, t: f32) -> Self {
-        ((self as f32 * t) + (other as f32 * (1.0 - t))) as u8
+        unsafe { fadd_fast(fmul_fast(self as f32, t), fmul_fast(other as f32, fsub_fast(1.0, t))) as u8 }
     }
 }
 
@@ -327,20 +329,59 @@ macro_rules! include_font {
     };
 }
 
+pub enum Curve {
+    Circle {
+        rad: f32
+    },
+    Linear {
+        y1: f32,
+        ylen: f32,
+        xlen: f32
+    }
+}
+
 pub struct Interpolator {
     x: f32,
+    x1: f32,
     x2: f32,
 
-    x1: f32,
-    y1: f32,
-
-    xlen: f32,
-    ylen: f32,
-    
     swapped: bool,
+    curve: Curve
 }
 
 impl Interpolator {
+    pub fn line(mut x1: f32, mut x2: f32, mut y1: f32, mut y2: f32) -> Self {
+        let mut swapped = false;
+
+        if unsafe { fabsf32(y2 - y1) > fabsf32(x2 - x1) } {
+            mem::swap(&mut x1, &mut y1);
+            mem::swap(&mut x2, &mut y2);
+            
+            swapped = true;
+        }
+
+        Interpolator {
+            x: x1,
+            x1, x2,
+            swapped,
+            curve: Curve::Linear {
+                xlen: x2 - x1,
+                ylen: y2 - y1,
+                y1
+            }
+        }
+    }
+
+    pub fn circle(x1: f32, x2: f32) -> Self {
+        Interpolator {
+            x: x1, x1, x2,
+            swapped: true,
+            curve: Curve::Circle {
+                rad: (x2 - x1)
+            }
+        }
+    }
+
     pub fn resolve(&self, x: f32, y: f32) -> (f32, f32) {
         if self.swapped {
             (y, x)
@@ -350,8 +391,15 @@ impl Interpolator {
     }
 
     pub fn get_co(&self) -> f32 {
-        let i = (self.x - self.x1) / self.xlen;
-        self.y1 + (i * self.ylen)
+        match self.curve {
+            Curve::Circle {rad} => unsafe {
+                sqrtf32(fsub_fast(powif32(rad, 2), powif32(self.x, 2)))
+            },
+            Curve::Linear {y1, xlen, ylen} => unsafe {
+                let i = fdiv_fast(fsub_fast(self.x, self.x1), xlen);
+                fadd_fast(y1, fmul_fast(i, ylen))
+            }
+        }
     }
 
     pub fn get_y_swap(&self) -> Option<f32> {
@@ -367,22 +415,6 @@ impl Interpolator {
             None
         } else {
             Some(self.x)
-        }
-    }
-
-    pub fn get_y(&self) -> f32 {
-        if self.swapped {
-            self.x
-        } else {
-            self.get_co()
-        }
-    }
-
-    pub fn get_x(&self) -> f32 {
-        if self.swapped {
-            self.get_co()
-        } else {
-            self.x
         }
     }
 }
@@ -404,27 +436,6 @@ impl core::iter::Iterator for Interpolator {
         } else {
             None
         }
-    }
-}
-
-pub fn interpolate<'a>(mut x1: f32, mut x2: f32, mut y1: f32, mut y2: f32) -> Interpolator {
-    let mut swapped = false;
-
-    if abs(y2 - y1) > abs(x2 - x1) {
-        mem::swap(&mut x1, &mut y1);
-        mem::swap(&mut x2, &mut y2);
-        
-        swapped = true;
-    }
-    
-    let xlen = x2 - x1;
-    let ylen = y2 - y1;
-
-    Interpolator {
-        x: x1, x2,
-        xlen, ylen,
-        x1, y1,
-        swapped,
     }
 }
 
@@ -494,11 +505,11 @@ pub trait DrawingConvert: Sized {
 
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
     fn blend(&mut self, x: i32, y: i32, color: TP);
-    fn antialiased_blend_frac(&mut self, x: f32, xf: f32, y: f32, yf: f32, color: TP);
     fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
     fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32);
     fn rect(&mut self, from: &Vector2, to: &Vector2, color: &TP);
+    fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP);
     
     fn triangle(&mut self, points: [&Vector2; 3], color: &TP);
     fn poly(&mut self, points: &[&Vector2], color: &TP);
@@ -533,21 +544,18 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn antialiased_blend_frac(&mut self, x: f32, xf: f32, y: f32, yf: f32, color: TP) {        
+    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) { unsafe {
+        let (xf, yf) = (frem_fast(x, 1.0), frem_fast(y, 1.0));   
         //set floor coordinate
-        self.blend((x - xf) as i32, (y - yf) as i32, color.clone().mult(1.0-xf-yf));
+        self.blend(fsub_fast(x, xf) as i32, fsub_fast(y, yf) as i32, color.clone().mult(fsub_fast(fsub_fast(1.0, xf), yf)));
         //set ceil coordinate
-        self.blend(frac_ceil(x, xf) as i32, frac_ceil(y, yf) as i32, color.mult((xf+yf)/2.0));
-    }
-
-    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) {        
-        self.antialiased_blend_frac(x, y, fract(x), fract(y), color);
-    }
+        self.blend(ceilf32(x) as i32, ceilf32(y) as i32, color.mult(fdiv_fast(fadd_fast(xf, yf), 2.0)));
+    } }
 
     fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32) {    
         let start_thickness = (-thickness/2) as f32;
 
-        for (x,y) in interpolate(from.x as f32, to.x as f32, from.y as f32, to.y as f32) {
+        for (x,y) in Interpolator::line(from.x as f32, to.x as f32, from.y as f32, to.y as f32) {
             for t in 0..thickness {
                 let offset_thickness = start_thickness + t as f32;
                 let y_thick = y + offset_thickness;
@@ -566,6 +574,12 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             }
         }
     }
+
+    fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP) {
+        for (x, y) in Interpolator::circle(from.x as f32, to.x as f32) {
+            self.antialiased_blend(x, from.y as f32 + y, color.clone());
+        }
+    }
     
     fn triangle(&mut self, mut points: [&Vector2; 3], color: &TP) {
         points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
@@ -574,8 +588,8 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             //ignore the casts :^)
             let step = if top { -1.0 } else { 1.0 };
             let (mut left, mut right) =
-                (interpolate(ult.x as f32, left.x as f32, ult.y as f32, left.y as f32 + step),
-                interpolate(ult.x as f32, right.x as f32, ult.y as f32, right.y as f32 + step));
+                (Interpolator::line(ult.x as f32, left.x as f32, ult.y as f32, left.y as f32 + step),
+                Interpolator::line(ult.x as f32, right.x as f32, ult.y as f32, right.y as f32 + step));
 
             let mut next_y = ult.y as f32;
 
@@ -591,7 +605,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                 fn check_line_x(interp: &mut Interpolator, next_y: f32, top: bool) -> Option<f32> {
                     if let Some(y) = interp.get_y_swap() {
                         if compare_y(y, next_y, top) {
-                            return Some(interp.get_x());
+                            return Some(interp.get_co());
                         }
                     }
                     
@@ -617,10 +631,10 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                 }
 
                 if (x2-x1) > 1 {
-                    b.antialiased_blend_frac(x1 as f32+0.9, 0.9, next_y, 0.0, color.clone());
+                    b.antialiased_blend(x1 as f32 + 0.9, next_y, color.clone());
                 }
                 
-                b.antialiased_blend_frac(x2 as f32+0.4, 0.4, next_y, 0.0, color.clone());
+                b.antialiased_blend(x2 as f32 + 0.4, next_y, color.clone());
 
                 for x in x1+2..x2 {
                     b.blend(x, next_y as i32, color.clone());

@@ -1,6 +1,5 @@
 #![no_std]
-
-pub use core::{mem, ptr};
+#![feature(core_intrinsics)]
 
 pub mod util;
 pub use util::*;
