@@ -11,15 +11,18 @@ use core::intrinsics::*;
 
 const PI: f32 = 3.14159265358979323846;
 
+// Linear easing functions
 pub fn linear_none(t: f32, b: f32, c: f32, d: f32) -> f32 { (c * t / d + b) }
 pub fn linear_in(t: f32, b: f32, c: f32, d: f32) -> f32 { (c * t / d + b) }
 pub fn linear_out(t: f32, b: f32, c: f32, d: f32) -> f32 { (c * t / d + b) }
 pub fn linear_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 { (c * t / d + b) }
 
+// Sine easing functions
 pub fn sine_in(t: f32, b: f32, c: f32, d: f32) -> f32 { (-c * (t / d * (PI / 2.0)).cos() + c + b) }
 pub fn sine_out(t: f32, b: f32, c: f32, d: f32) -> f32 { (c * (t / d * (PI / 2.0)).sin() + b) }
 pub fn sine_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 { (-c / 2.0 * ((PI * t / d).cos() - 1.0) + b) }
 
+// Circular easing functions
 pub fn circ_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let td = t / d;
     (-c * ((1.0 - td * td).sqrt() - 1.0) + b)
@@ -41,6 +44,7 @@ pub fn circ_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Cubic easing functions
 pub fn cubic_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let td = t / d;
     (c * td * td * td + b)
@@ -62,6 +66,7 @@ pub fn cubic_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Quadratic easing functions
 pub fn quad_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let td = t / d;
     (c * td * td + b)
@@ -82,6 +87,7 @@ pub fn quad_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Exponential easing functions
 pub fn expo_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     if t == 0.0 {
         b
@@ -113,6 +119,7 @@ pub fn expo_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Back easing functions
 pub fn back_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let s = 1.70158f32;
     let postfix = t / d;
@@ -139,6 +146,7 @@ pub fn back_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Bounce easing functions
 pub fn bounce_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let mut td = t / d;
     if td < (1.0 / 2.75) {
@@ -171,6 +179,7 @@ pub fn bounce_in_out(t: f32, b: f32, c: f32, d: f32) -> f32 {
     }
 }
 
+// Elastic easing functions
 pub fn elastic_in(t: f32, b: f32, c: f32, d: f32) -> f32 {
     let mut td = t / d;
     
