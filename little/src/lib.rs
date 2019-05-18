@@ -6,6 +6,7 @@ pub use util::*;
 
 pub mod drawing;
 pub mod input;
+pub mod ease;
 
 pub trait Platform<Surface: drawing::Buffer<Format=drawing::RGB> + drawing::WriteBuffer> {
     fn init() -> Self;
