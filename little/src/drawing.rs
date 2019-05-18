@@ -464,6 +464,7 @@ pub trait DrawingConvert: Sized {
 
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
     fn blend(&mut self, x: i32, y: i32, color: TP);
+    fn antialiased_blend_frac(&mut self, x: f32, xf: f32, y: f32, yf: f32, color: TP);
     fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
     fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32);
@@ -502,14 +503,15 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) {        
-        let fx = fract(x);
-        let fy = fract(y);
-
+    fn antialiased_blend_frac(&mut self, x: f32, xf: f32, y: f32, yf: f32, color: TP) {        
         //set floor coordinate
-        self.blend((x - fx) as i32, (y - fy) as i32, color.clone().mult(1.0-fx-fy));
+        self.blend((x - xf) as i32, (y - yf) as i32, color.clone().mult(1.0-xf-yf));
         //set ceil coordinate
-        self.blend(frac_ceil(x, fx) as i32, frac_ceil(y, fy) as i32, color.mult((fx+fy)/1.0));
+        self.blend(frac_ceil(x, xf) as i32, frac_ceil(y, yf) as i32, color.mult((xf+yf)/2.0));
+    }
+
+    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) {        
+        self.antialiased_blend_frac(x, y, fract(x), fract(y), color);
     }
 
     fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32) {    
@@ -546,20 +548,20 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             let mut next_y = ult.y as f32 + step;
 
             loop {
-                let mut x1 = loop {
+                let (mut x1, y1) = loop {
                     if let Some((x, y)) = left.next() {
                         if (y >= next_y && top) || (y <= next_y && !top) {
-                            break x;
+                            break (x, y);
                         }
                     } else {
                         return;
                     }
                 };
 
-                let mut x2 = loop {
+                let (mut x2, y2) = loop {
                     if let Some((x, y)) = right.next() {
                         if (y >= next_y && top) || (y <= next_y && !top) {
-                            break x;
+                            break (x, y);
                         }
                     } else {
                         return;
@@ -570,12 +572,25 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
                     mem::swap(&mut x1, &mut x2);
                 }
 
-                let fx1 = fract(x1);
-                let fx2 = fract(x2);
-                for x in (x1+1.0-fx1) as i32..(x2-fx2) as i32 {
-                    b.antialiased_blend(x as f32 + (fx1 + (fx2 * (x as f32 / x2)) / 2.0), next_y, color.clone());
-                }
+                let x1f = fract(x1);
+                let x2f = fract(x2);
 
+                if (x2-x1) > 1.0 {
+                    b.antialiased_blend_frac(x1, x1f, y1, fract(y1), color.clone());
+                }
+                
+                b.antialiased_blend_frac(x2, x2f, y2, fract(y2), color.clone());
+
+                let y = if top {
+                        y1.max(y2) as i32
+                    } else {
+                        y1.min(y2) as i32
+                    };
+
+                for x in (x1+1.0-x1f) as i32..(x2+x2f) as i32 {
+                    b.blend(x, y, color.clone());
+                }
+                
                 next_y += step;
             }
         }
@@ -589,7 +604,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
             let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
             
             flat_triangle(self, points[0], &mid, points[1], color, false);
-            flat_triangle(self, points[1], &mid, points[2], color, true);
+            // flat_triangle(self, points[1], &mid, points[2], color, true);
         }
     }
 
