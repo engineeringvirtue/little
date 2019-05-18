@@ -1,5 +1,3 @@
-#![feature(core_intrinsics)]
-
 // t = current time
 // b = starting value to interpolate
 // c = the total change in value of b that needs to occur
