@@ -329,24 +329,16 @@ macro_rules! include_font {
     };
 }
 
-pub enum Curve {
-    Circle {
-        rad: f32
-    },
-    Linear {
-        y1: f32,
-        ylen: f32,
-        xlen: f32
-    }
-}
-
 pub struct Interpolator {
     x: f32,
     x1: f32,
     x2: f32,
+    y1: f32,
 
-    swapped: bool,
-    curve: Curve
+    ylen: f32,
+    xlen: f32,
+
+    swapped: bool
 }
 
 impl Interpolator {
@@ -363,22 +355,12 @@ impl Interpolator {
         Interpolator {
             x: x1,
             x1, x2,
-            swapped,
-            curve: Curve::Linear {
-                xlen: x2 - x1,
-                ylen: y2 - y1,
-                y1
-            }
-        }
-    }
-
-    pub fn circle(x1: f32, x2: f32) -> Self {
-        Interpolator {
-            x: x1, x1, x2,
-            swapped: true,
-            curve: Curve::Circle {
-                rad: (x2 - x1)
-            }
+            y1,
+            
+            xlen: x2 - x1,
+            ylen: y2 - y1,
+            
+            swapped
         }
     }
 
@@ -391,14 +373,9 @@ impl Interpolator {
     }
 
     pub fn get_co(&self) -> f32 {
-        match self.curve {
-            Curve::Circle {rad} => unsafe {
-                sqrtf32(fsub_fast(powif32(rad, 2), powif32(self.x, 2)))
-            },
-            Curve::Linear {y1, xlen, ylen} => unsafe {
-                let i = fdiv_fast(fsub_fast(self.x, self.x1), xlen);
-                fadd_fast(y1, fmul_fast(i, ylen))
-            }
+        unsafe {
+            let i = fdiv_fast(fsub_fast(self.x, self.x1), self.xlen);
+            fadd_fast(self.y1, fmul_fast(i, self.ylen))
         }
     }
 
@@ -576,9 +553,9 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
     }
 
     fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP) {
-        for (x, y) in Interpolator::circle(from.x as f32, to.x as f32) {
-            self.antialiased_blend(x, from.y as f32 + y, color.clone());
-        }
+        // for (x, y) in Interpolator::circle(from.x as f32, to.x as f32) {
+        //     self.antialiased_blend(x, from.y as f32 + y, color.clone());
+        // }
     }
     
     fn triangle(&mut self, mut points: [&Vector2; 3], color: &TP) {

@@ -1,4 +1,5 @@
 use super::*;
+use core::intrinsics::*;
 
 pub fn transmute<T>(b: &[u8]) -> T {
     unsafe { core::ptr::read(b.as_ptr() as *const T) }
@@ -60,4 +61,20 @@ impl Region {
         pos.x >= self.from.x && pos.y >= self.from.y
             && pos.x <= self.to.x && pos.y <= self.to.y
     }
+}
+
+pub fn cos(f: f32) -> f32 {
+    unsafe { cosf32(f) }
+}
+
+pub fn sin(f: f32) -> f32 {
+    unsafe { sinf32(f) }
+}
+
+pub fn sqrt(f: f32) -> f32 {
+    unsafe { sqrtf32(f) }
+}
+
+pub fn pow(f: f32, x: f32) -> f32 {
+    unsafe { powf32(f, x) }
 }
