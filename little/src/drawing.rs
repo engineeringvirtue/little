@@ -1,5 +1,5 @@
 use super::*;
-use core::{mem, ptr, intrinsics::*};
+use core::{mem, ptr};
 use util::transmute;
 
 pub trait Pixel: Clone {
@@ -38,7 +38,7 @@ impl Pixel for u8 {
     }
 
     fn choose(self, other: Self, t: f32) -> Self {
-        unsafe { fadd_fast(fmul_fast(self as f32, t), fmul_fast(other as f32, fsub_fast(1.0, t))) as u8 }
+        ((self as f32 * t) + (other as f32 * (1.0-t))) as u8
     }
 }
 
@@ -345,7 +345,7 @@ impl Interpolator {
     pub fn line(mut x1: f32, mut x2: f32, mut y1: f32, mut y2: f32) -> Self {
         let mut swapped = false;
 
-        if unsafe { fabsf32(y2 - y1) > fabsf32(x2 - x1) } {
+        if abs(y2 - y1) > abs(x2 - x1) {
             mem::swap(&mut x1, &mut y1);
             mem::swap(&mut x2, &mut y2);
             
@@ -373,10 +373,8 @@ impl Interpolator {
     }
 
     pub fn get_co(&self) -> f32 {
-        unsafe {
-            let i = fdiv_fast(fsub_fast(self.x, self.x1), self.xlen);
-            fadd_fast(self.y1, fmul_fast(i, self.ylen))
-        }
+        let i = (self.x-self.x1)/self.xlen;
+        self.y1 + (i*self.ylen)
     }
 
     pub fn get_y_swap(&self) -> Option<f32> {
@@ -522,11 +520,11 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
     }
 
     fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) { unsafe {
-        let (xf, yf) = (frem_fast(x, 1.0), frem_fast(y, 1.0));   
+        let (xf, yf) = (x%1.0, y%1.0);   
         //set floor coordinate
-        self.blend(fsub_fast(x, xf) as i32, fsub_fast(y, yf) as i32, color.clone().mult(fsub_fast(fsub_fast(1.0, xf), yf)));
+        self.blend((x-xf) as i32, (y-yf) as i32, color.clone().mult(1.0-xf-yf));
         //set ceil coordinate
-        self.blend(ceilf32(x) as i32, ceilf32(y) as i32, color.mult(fdiv_fast(fadd_fast(xf, yf), 2.0)));
+        self.blend(ceil(x) as i32, ceil(y) as i32, color.mult((xf+yf)/2.0));
     } }
 
     fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32) {    
@@ -553,9 +551,15 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
     }
 
     fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP) {
-        // for (x, y) in Interpolator::circle(from.x as f32, to.x as f32) {
-        //     self.antialiased_blend(x, from.y as f32 + y, color.clone());
-        // }
+        let (h, w) = (to.y - from.y, to.x - from.x);
+
+        for y in 0..h {
+            for x in 0..w {
+                if (x*x*h*h) + (y*y*w*w) <= h*h*w*w {
+                    self.blend(from.x + x, from.y + y, color.clone());
+                }
+            }
+        }
     }
     
     fn triangle(&mut self, mut points: [&Vector2; 3], color: &TP) {

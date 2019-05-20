@@ -6,12 +6,6 @@
 use super::*;
 use core::f32::consts::PI;
 
-pub trait Value {
-    type Output;
-
-    fn get_at(t: f32) -> Self::Output;
-}
-
 pub trait GlobalTime {
     fn get_time(&self) -> f32;
 }
@@ -46,7 +40,7 @@ impl Animation {
         }
     }
     
-    pub fn new_gt(gt: &GlobalTime, off: f32, dur: f32, from: f32, to: f32, easing: Easing) -> Self {
+    pub fn new_gt<T: GlobalTime>(gt: &T, off: f32, dur: f32, from: f32, to: f32, easing: Easing) -> Self {
         Animation {
             offset: gt.get_time() + off,
             duration: dur, from, to, easing
@@ -236,5 +230,9 @@ impl Animation {
                 }
             }
         }
+    }
+
+    pub fn get_gt<T: GlobalTime>(&self, gt: &T) -> f32 {
+        self.get(gt.get_time())
     }
 }

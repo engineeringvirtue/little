@@ -1,0 +1,9 @@
+[package]
+name = "little-cortex"
+version = "0.1.0"
+authors = ["Thomas-QM <thomas@engineeringvirtue.net>"]
+edition = "2018"
+
+[dependencies]
+little = {path = "../little"}
+# cortex-m-rt = "0.6.8"

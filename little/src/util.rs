@@ -75,6 +75,18 @@ pub fn sqrt(f: f32) -> f32 {
     unsafe { sqrtf32(f) }
 }
 
+pub fn abs(f: f32) -> f32 {
+    unsafe { fabsf32(f) }
+}
+
+pub fn floor(f: f32) -> f32 {
+    unsafe { floorf32(f) }
+}
+
+pub fn ceil(f: f32) -> f32 {
+    unsafe { ceilf32(f) }
+}
+
 pub fn pow(f: f32, x: f32) -> f32 {
     unsafe { powf32(f, x) }
 }
