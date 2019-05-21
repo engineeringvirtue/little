@@ -72,7 +72,7 @@ impl Pixel for RGBA {
     }
 
     fn mult(self, t: f32) -> Self {
-        RGBA(self.0.mult(t), self.1.mult(t), self.2.mult(t), self.3.mult(t))
+        RGBA(self.0, self.1, self.2, self.3.mult(t))
     }
 
     fn choose(self, other: Self, t: f32) -> Self {
@@ -329,91 +329,6 @@ macro_rules! include_font {
     };
 }
 
-pub struct Interpolator {
-    x: f32,
-    x1: f32,
-    x2: f32,
-    y1: f32,
-
-    ylen: f32,
-    xlen: f32,
-
-    swapped: bool
-}
-
-impl Interpolator {
-    pub fn line(mut x1: f32, mut x2: f32, mut y1: f32, mut y2: f32) -> Self {
-        let mut swapped = false;
-
-        if abs(y2 - y1) > abs(x2 - x1) {
-            mem::swap(&mut x1, &mut y1);
-            mem::swap(&mut x2, &mut y2);
-            
-            swapped = true;
-        }
-
-        Interpolator {
-            x: x1,
-            x1, x2,
-            y1,
-            
-            xlen: x2 - x1,
-            ylen: y2 - y1,
-            
-            swapped
-        }
-    }
-
-    pub fn resolve(&self, x: f32, y: f32) -> (f32, f32) {
-        if self.swapped {
-            (y, x)
-        } else {
-            (x, y)
-        }
-    }
-
-    pub fn get_co(&self) -> f32 {
-        let i = (self.x-self.x1)/self.xlen;
-        self.y1 + (i*self.ylen)
-    }
-
-    pub fn get_y_swap(&self) -> Option<f32> {
-        if self.swapped {
-            Some(self.x)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_x_swap(&self) -> Option<f32> {
-        if self.swapped {
-            None
-        } else {
-            Some(self.x)
-        }
-    }
-}
-
-impl core::iter::Iterator for Interpolator {
-    type Item = (f32, f32);
-
-    fn next(&mut self) -> Option<(f32, f32)> {
-        let x = self.resolve(self.x, self.get_co());
-
-        if self.x != self.x2 {
-            if self.x2 > self.x {
-                self.x += 1.0;
-            } else {
-                self.x -= 1.0;
-            }
-            
-            Some(x)
-        } else {
-            None
-        }
-    }
-}
-
 fn blend_multiply<P: Pixel, SP: Pixel, Source: FnOnce() -> SP>(color: P, p: Source) -> P {
     let t = p().soft_blend();
     color.mult(t)
@@ -479,18 +394,26 @@ pub trait DrawingConvert: Sized {
 }
 
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
+    fn bounded(&self, x: Vector2) -> Vector2;
+    
     fn blend(&mut self, x: i32, y: i32, color: TP);
+
+    fn antialiased_blend_x(&mut self, x: f32, y: i32, color: TP);
+    fn antialiased_blend_y(&mut self, x: i32, y: f32, color: TP);
     fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
-    fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32);
-    fn rect(&mut self, from: &Vector2, to: &Vector2, color: &TP);
-    fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP);
+    fn line(&mut self, from: Vector2, to: Vector2, color: &TP, thickness: i32);
+    fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, thickness: i32, color: &TP);
     
-    fn triangle(&mut self, points: [&Vector2; 3], color: &TP);
-    fn poly(&mut self, points: &[&Vector2], color: &TP);
+    fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
+    fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP);
     
+    fn triangle(&mut self, points: [Vector2; 3], color: &TP);
+    fn poly(&mut self, points: &[Vector2], color: &TP);
+    
+    fn transform(&mut self, scale: Vector2, angle: i32, skew: i32);
     fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Vector2, to: &Vector2, color: &TP) where u8: ToPixel<TP>;
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP>;
 }
 
 impl<S: Buffer + Sized> DrawingConvert for S {
@@ -504,11 +427,23 @@ impl<S: Buffer + Sized> DrawingConvert for S {
 }
 
 impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {
-    fn blend(&mut self, x: i32, y: i32, color: TP) {
-        if x < 0 || y < 0 || x >= self.width() || y >= self.height() {
-            return;
+    fn bounded(&self, mut x: Vector2) -> Vector2 {
+        if x.x < 0 {
+            x.x = 0;
+        } else if x.x > self.width() {
+            x.x = self.width();
+        }
+        
+        if x.y < 0 {
+            x.y = 0;
+        } else if x.y > self.height() {
+            x.y = self.height();
         }
 
+        x
+    }
+
+    fn blend(&mut self, x: i32, y: i32, color: TP) {
         if color.soft() {
             let t = color.soft_blend();
             let px = color.to_pixel().choose(self.get_pixel(x, y), t);
@@ -519,30 +454,74 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) { unsafe {
+    fn antialiased_blend_x(&mut self, x: f32, y: i32, color: TP) {
+        let xf = x%1.0;
+        
+        self.blend((x-xf) as i32, y, color.clone().mult(1.0-xf));
+        self.blend(ceil(x) as i32, y, color.mult(xf/1.0));
+    }
+
+    fn antialiased_blend_y(&mut self, x: i32, y: f32, color: TP) {
+        let yf = y%1.0;
+        
+        self.blend(x, (y-yf) as i32, color.clone().mult(1.0-yf));
+        self.blend(x, ceil(y) as i32, color.mult(yf));
+    }
+
+    fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) {
         let (xf, yf) = (x%1.0, y%1.0);   
         //set floor coordinate
         self.blend((x-xf) as i32, (y-yf) as i32, color.clone().mult(1.0-xf-yf));
         //set ceil coordinate
         self.blend(ceil(x) as i32, ceil(y) as i32, color.mult((xf+yf)/2.0));
-    } }
+    }
 
-    fn line(&mut self, from: &Vector2, to: &Vector2, color: &TP, thickness: i32) {    
-        let start_thickness = (-thickness/2) as f32;
+    fn line(&mut self, mut from: Vector2, mut to: Vector2, color: &TP, thickness: i32) {
+        let swapped = (to.y - from.y) > (to.x - from.x);
+        
+        if swapped {
+            mem::swap(&mut from.x, &mut from.y);
+            mem::swap(&mut to.x, &mut to.y);
+        }
 
-        for (x,y) in Interpolator::line(from.x as f32, to.x as f32, from.y as f32, to.y as f32) {
-            for t in 0..thickness {
-                let offset_thickness = start_thickness + t as f32;
-                let y_thick = y + offset_thickness;
-                let x_thick = x + offset_thickness;
+        if from.x > to.x {
+            mem::swap(&mut to, &mut from);
+        }
 
-                self.antialiased_blend(x_thick, y, color.clone());
-                self.antialiased_blend(x, y_thick, color.clone());
+        let xlen = (to.x - from.x) as f32;
+        let ylen = (to.y - from.y) as f32;
+        
+        let slope = ylen / xlen;
+
+        let mut y = from.y as f32 + slope;
+        for x in from.x..to.x {
+            for thick_x in 0..thickness+1 {
+                if thick_x > 0 && thick_x < thickness {
+                    if swapped {
+                        self.blend(floor(y) as i32 + thick_x, x, color.clone());
+                        self.blend(ceil(y) as i32 + thick_x, x, color.clone());
+                    } else {
+                        self.blend(x, floor(y) as i32 + thick_x, color.clone());
+                        self.blend(x, ceil(y) as i32 + thick_x, color.clone());
+                    }
+                } else {
+                    if swapped {
+                        self.antialiased_blend_x(y + thick_x as f32, x, color.clone());
+                    } else {
+                        self.antialiased_blend_y(x, y + thick_x as f32, color.clone());
+                    }
+                }
             }
+
+            y += slope;
         }
     }
 
-    fn rect(&mut self, from: &Vector2, to: &Vector2, color: &TP) {
+    fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, thickness: i32, color: &TP) {
+
+    }
+
+    fn rect(&mut self, from: Vector2, to: Vector2, color: &TP) {
         for y in from.y..to.y {
             for x in from.x..to.x {
                 self.blend(x, y, color.clone());
@@ -550,7 +529,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
 
-    fn ellipse(&mut self, from: &Vector2, to: &Vector2, color: &TP) {
+    fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP) {
         let (h, w) = (to.y - from.y, to.x - from.x);
 
         for y in 0..h {
@@ -562,98 +541,78 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn triangle(&mut self, mut points: [&Vector2; 3], color: &TP) {
+    fn triangle(&mut self, mut points: [Vector2; 3], color: &TP) {
         points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
-        fn flat_triangle<B: Buffer + WriteBuffer, TP: ToPixel<B::Format>>(b: &mut B, ult: &Vector2, left: &Vector2, right: &Vector2, color: &TP, top: bool) {
-            //ignore the casts :^)
-            let step = if top { -1.0 } else { 1.0 };
-            let (mut left, mut right) =
-                (Interpolator::line(ult.x as f32, left.x as f32, ult.y as f32, left.y as f32 + step),
-                Interpolator::line(ult.x as f32, right.x as f32, ult.y as f32, right.y as f32 + step));
+        let mut flat_triangle = |ult: Vector2, mut left: Vector2, mut right: Vector2, top: bool| {
+            if left.x > right.x {
+                mem::swap(&mut left, &mut right);
+            }
 
-            let mut next_y = ult.y as f32;
+            let left_slope = (left.x - ult.x) as f32 / (left.y - ult.y) as f32;
+            let right_slope = (right.x - ult.x) as f32 / (right.y - ult.y) as f32;
+            
+            let mut left_x = left.x as f32;
+            let mut right_x = right.x as f32;
 
-            loop {
-                if !top {
-                    next_y += step;
-                }
-
-                fn compare_y(y: f32, next_y: f32, top: bool) -> bool {
-                    (y < next_y && top) || (y > next_y && !top)
-                }
-
-                fn check_line_x(interp: &mut Interpolator, next_y: f32, top: bool) -> Option<f32> {
-                    if let Some(y) = interp.get_y_swap() {
-                        if compare_y(y, next_y, top) {
-                            return Some(interp.get_co());
-                        }
-                    }
+            if top {
+                for y in left.y..ult.y-1 {
+                    self.antialiased_blend_x(left_x, y, color.clone());
+                    self.antialiased_blend_x(right_x, y, color.clone());
                     
-                    loop {
-                        if let Some((x, y)) = interp.next() {
-                            if compare_y(y, next_y, top) {
-                                break Some(x);
-                            }
-                        } else {
-                            break None;
-                        }
-                    }
+                    // for x in left_x..right_x {
+
+                    // }
+
+                    left_x += left_slope;
+                    right_x += right_slope;
                 }
+            } else {
+                for y in ult.y..left.y-1 {
+                    self.antialiased_blend_x(left_x, y, color.clone());
+                    self.antialiased_blend_x(right_x, y, color.clone());
+                    
+                    // for x in left_x..right_x {
 
-                let (mut x1, mut x2) =
-                    match (check_line_x(&mut left, next_y, top), check_line_x(&mut right, next_y, top)) {
-                        (Some(x1), Some(x2)) => (x1 as i32, x2 as i32),
-                        _ => return
-                    };
+                    // }
 
-                if x2 < x1 {
-                    mem::swap(&mut x1, &mut x2);
-                }
-
-                if (x2-x1) > 1 {
-                    b.antialiased_blend(x1 as f32 + 0.9, next_y, color.clone());
-                }
-                
-                b.antialiased_blend(x2 as f32 + 0.4, next_y, color.clone());
-
-                for x in x1+2..x2 {
-                    b.blend(x, next_y as i32, color.clone());
-                }
-
-                if top {
-                    next_y += step;
+                    left_x += left_slope;
+                    right_x += right_slope;
                 }
             }
-        }
+        };
 
         if points[0].y == points[1].y {
-            flat_triangle(self, points[2], points[0], points[1], color, true);
+            flat_triangle(points[2], points[0], points[1], true);
         } else if points[1].y == points[2].y {
-            flat_triangle(self, points[0], points[1], points[2], color, false);
+            flat_triangle(points[0], points[1], points[2], false);
         } else {
             //hard math you can find it here http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
             let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
             
-            flat_triangle(self, points[0], &mid, points[1], color, false);
-            flat_triangle(self, points[2], &mid, points[1], color, true);
+            flat_triangle(points[0], mid, points[1], false);
+            flat_triangle(points[2], mid, points[1], true);
         }
     }
 
-    fn poly(&mut self, points: &[&Vector2], color: &TP) {
+    fn poly(&mut self, points: &[Vector2], color: &TP) {
         for p1 in 0..points.len() {
             if p1 > 0 {
                 let p2 = points[p1 - 1];
                 
-                if let Some(p3) = points.get(p1+1) {
-                    self.triangle([&points[p1], &p2, p3], color);
+                if points.len() > p1 {
+                    self.triangle([points[p1], p2, points[p1+1]], color);
                 } else {
-                    self.triangle([&points[p1], &points[0], p2], color);
+                    self.triangle([points[p1], points[0], p2], color);
                 }
             } else {
-                self.triangle([&points[p1], points.last().unwrap(), &points[p1+1]], color);
+                self.triangle([points[p1], points[points.len()-1], points[p1+1]], color);
             }
         }
+    }
+
+    fn transform(&mut self, scale: Vector2, angle: i32, skew: i32) {
+
     }
 
     fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B) {
@@ -672,7 +631,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
         }
     }
     
-    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: &Vector2, to: &Vector2, color: &TP) where u8: ToPixel<TP> {
+    fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP> {
         let mut iter = txt.txt.chars().peekable();
         
         let mut x = from.x as f32;
