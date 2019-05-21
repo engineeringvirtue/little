@@ -9,11 +9,11 @@ pub mod input;
 pub mod anim;
 
 pub trait Platform<Surface: drawing::Buffer<Format=drawing::RGB> + drawing::WriteBuffer> {
-    fn init() -> Self;
-    
-    fn surface(&mut self) -> &mut Surface;
-    
-    fn step(&mut self) -> bool;
+	fn init() -> Self;
+	
+	fn surface(&mut self) -> &mut Surface;
+	
+	fn step(&mut self) -> bool;
 
-    fn stop(self);
+	fn stop(self);
 }

@@ -30,13 +30,13 @@ The \inliners{Platform} trait should be implemented for target platforms.
 Each \inliners{Buffer} has the following primitive drawing functions:
 
 \begin{labeling}{triangle}
-    \item[bounded] Checks whether point lies within the buffer.
-    \item[line] Draws a line from \inliners{from} to \inliners{to} with thickness \inliners{thickness}.
-    \item[arc] Draws an arc from \inliners{from} to \inliners{to} along the specified \inliners{start} and \inliners{end} with thickness \inliners {thickness}.
-    \item[rect] Draws a rectangle from \inliners{from} to \inliners{to} with roundness \inliners{round}.
-    \item[ellipse] Draws an ellipse from \inliners{from} to \inliners{to} along the specified \inliners{start} and \inliners{end}.
-    \item[triangle] Draws a triangle along the three vectors in the \inliners{points} array.
-    \item[poly] Fills a polygon specified by the \inliners{points} slice with triangles.
+	\item[bounded] Checks whether point lies within the buffer.
+	\item[line] Draws a line from \inliners{from} to \inliners{to} with thickness \inliners{thickness}.
+	\item[arc] Draws an arc from \inliners{from} to \inliners{to} along the specified \inliners{start} and \inliners{end} with thickness \inliners {thickness}.
+	\item[rect] Draws a rectangle from \inliners{from} to \inliners{to} with roundness \inliners{round}.
+	\item[ellipse] Draws an ellipse from \inliners{from} to \inliners{to} along the specified \inliners{start} and \inliners{end}.
+	\item[triangle] Draws a triangle along the three vectors in the \inliners{points} array.
+	\item[poly] Fills a polygon specified by the \inliners{points} slice with triangles.
 \end{labeling}
 
 To achieve more complex diagrams, you can selectively mask buffers using \inliners{with_color} and then \inliners{copy} that onto the base buffer. Transforming is no more complicated: \inliners{buffer.transform} with a \inliners{scale} vector, \inliners{angle} rotation and skew \inliners{skew}.

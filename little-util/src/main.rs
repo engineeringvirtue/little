@@ -15,11 +15,11 @@ use std::process;
 
 /// CLI Entry Point
 fn main() {
-    match run::run() {
-        Ok(i) => process::exit(i),
-        Err(e) => {
-            writeln!(io::stderr(), "{}", e).expect("Unable to write to stderr!");
-            process::exit(1)
-        }
-    }
+	match run::run() {
+		Ok(i) => process::exit(i),
+		Err(e) => {
+			writeln!(io::stderr(), "{}", e).expect("Unable to write to stderr!");
+			process::exit(1)
+		}
+	}
 }
