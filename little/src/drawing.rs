@@ -400,6 +400,10 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 
 	fn antialiased_blend_x(&mut self, x: f32, y: i32, color: TP);
 	fn antialiased_blend_y(&mut self, x: i32, y: f32, color: TP);
+
+	fn antialiased_blend_x_dir(&mut self, x: f32, y: i32, right: bool, color: TP);
+	fn antialiased_blend_y_dir(&mut self, x: i32, y: f32, right: bool, color: TP);
+
 	fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
 	fn line(&mut self, from: Vector2, to: Vector2, color: &TP, thickness: i32);
@@ -411,7 +415,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
 	
-	fn transform(&mut self, scale: Vector2, angle: i32, skew: i32);
+	fn transform(&mut self, pos: Vector2, scale: Vector2f, angle: i32, skew: i32);
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
 	fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP>;
 }
@@ -457,15 +461,45 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 	fn antialiased_blend_x(&mut self, x: f32, y: i32, color: TP) {
 		let xf = x%1.0;
 		
-		self.blend((x-xf) as i32, y, color.clone().mult(1.0-xf));
+		self.blend((x-xf) as i32, y, color.clone().mult(1.0-(xf/2.0)));
 		self.blend(ceil(x) as i32, y, color.mult(xf/1.0));
 	}
 
 	fn antialiased_blend_y(&mut self, x: i32, y: f32, color: TP) {
 		let yf = y%1.0;
 		
-		self.blend(x, (y-yf) as i32, color.clone().mult(1.0-yf));
-		self.blend(x, ceil(y) as i32, color.mult(yf));
+		self.blend(x, (y-yf) as i32, color.clone().mult(1.0-(yf/2.0)));
+		self.blend(x, ceil(y) as i32, color.mult(yf/1.0));
+	}
+
+	fn antialiased_blend_x_dir(&mut self, x: f32, y: i32, right: bool, color: TP) {
+		let xf = x%1.0;
+		
+		if right {
+			self.blend((x-xf) as i32, y, color.clone().mult(1.0));
+			self.blend(ceil(x) as i32, y, color.mult(xf));
+		} else {
+			if xf > 0.0 {
+				self.blend((x-xf) as i32, y, color.clone().mult(1.0-xf));
+			}
+
+			self.blend(ceil(x) as i32, y, color.mult(1.0));
+		}
+	}
+
+	fn antialiased_blend_y_dir(&mut self, x: i32, y: f32, right: bool, color: TP) {
+		let yf = y%1.0;
+		
+		if right {
+			self.blend(x, (y-yf) as i32, color.clone().mult(1.0));
+			self.blend(x, ceil(y) as i32, color.mult(yf));
+		} else {
+			if yf > 0.0 {
+				self.blend(x, (y-yf) as i32, color.clone().mult(1.0-yf));
+			}
+			
+			self.blend(x, ceil(y) as i32, color.mult(1.0));
+		}
 	}
 
 	fn antialiased_blend(&mut self, x: f32, y: f32, color: TP) {
@@ -490,25 +524,26 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
 		let xlen = (to.x - from.x) as f32;
 		let ylen = (to.y - from.y) as f32;
-		
 		let slope = ylen / xlen;
 
-		let mut y = from.y as f32 + slope;
+		let mut y = from.y as f32;
 		for x in from.x..to.x {
 			for thick_x in 0..thickness+1 {
-				if thick_x > 0 && thick_x < thickness {
-					if swapped {
-						self.blend(floor(y) as i32 + thick_x, x, color.clone());
-						self.blend(ceil(y) as i32 + thick_x, x, color.clone());
+				if (!swapped && y as i32 + thick_x < self.width()) || (swapped && y as i32 + thick_x < self.height()) {
+					if thick_x > 0 && thick_x < thickness {
+						if swapped {
+							self.blend(floor(y) as i32 + thick_x, x, color.clone());
+							self.blend(ceil(y) as i32 + thick_x, x, color.clone());
+						} else {
+							self.blend(x, floor(y) as i32 + thick_x, color.clone());
+							self.blend(x, ceil(y) as i32 + thick_x, color.clone());
+						}
 					} else {
-						self.blend(x, floor(y) as i32 + thick_x, color.clone());
-						self.blend(x, ceil(y) as i32 + thick_x, color.clone());
-					}
-				} else {
-					if swapped {
-						self.antialiased_blend_x(y + thick_x as f32, x, color.clone());
-					} else {
-						self.antialiased_blend_y(x, y + thick_x as f32, color.clone());
+						if swapped {
+							self.antialiased_blend_x(y + thick_x as f32, x, color.clone());
+						} else {
+							self.antialiased_blend_y(x, y + thick_x as f32, color.clone());
+						}
 					}
 				}
 			}
@@ -555,12 +590,14 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 			let mut left_x = left.x as f32;
 			let mut right_x = right.x as f32;
 
+			self.blend(ult.x, ult.y, color.clone());
+			
 			if top {
-				for y in left.y-1..ult.y-1 {
-					self.antialiased_blend_x(left_x, y, color.clone());
-					self.antialiased_blend_x(right_x, y, color.clone());
+				for y in left.y..ult.y {
+					self.antialiased_blend_x_dir(left_x, y, false, color.clone());
+					self.antialiased_blend_x_dir(right_x, y, true, color.clone());
 					
-					for x in ceil(left_x) as i32 + 2..floor(right_x) as i32 + 1 {
+					for x in ceil(left_x) as i32+1..floor(right_x) as i32 {
 						self.blend(x, y, color.clone());
 					}
 
@@ -568,14 +605,14 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 					right_x += right_slope;
 				}
 			} else {
-				for y in (ult.y..left.y-1).into_iter().rev() {
-					self.antialiased_blend_x(left_x, y, color.clone());
-					self.antialiased_blend_x(right_x, y, color.clone());
+				for y in (ult.y+1..left.y).into_iter().rev() {
+					self.antialiased_blend_x_dir(right_x, y, true, color.clone());
+					self.antialiased_blend_x_dir(left_x, y, false, color.clone());
 					
-					for x in ceil(left_x) as i32 + 1..floor(right_x) as i32 + 1 {
+					for x in ceil(left_x) as i32+1..floor(right_x) as i32 {
 						self.blend(x, y, color.clone());
 					}
-
+					
 					left_x -= left_slope;
 					right_x -= right_slope;
 				}
@@ -585,13 +622,13 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		if points[0].y == points[1].y {
 			flat_triangle(points[2], points[0], points[1], true);
 		} else if points[1].y == points[2].y {
-			flat_triangle(points[0], points[1], points[2], false);
+			// flat_triangle(points[0], points[1], points[2], false);
 		} else {
 			//hard math you can find it here http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-			let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
+			// let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
 			
-			flat_triangle(points[0], mid, points[1], false);
-			flat_triangle(points[2], mid, points[1], true);
+			// flat_triangle(points[0], mid, points[1], false);
+			// flat_triangle(points[2], mid, points[1], true);
 		}
 	}
 
@@ -611,8 +648,8 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn transform(&mut self, scale: Vector2, angle: i32, skew: i32) {
-
+	fn transform(&mut self, pos: Vector2, scale: Vector2f, angle: i32, skew: i32) {
+		// let matrix = [];
 	}
 
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B) {
