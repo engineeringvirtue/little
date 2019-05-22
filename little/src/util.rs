@@ -56,11 +56,6 @@ impl Region {
 	pub fn new(from: Vector2, to: Vector2) -> Self {
 		Region {from, to}
 	}
-
-	pub fn inside(&self, pos: Vector2) -> bool {
-		pos.x >= self.from.x && pos.y >= self.from.y
-			&& pos.x <= self.to.x && pos.y <= self.to.y
-	}
 }
 
 pub fn cos(f: f32) -> f32 {

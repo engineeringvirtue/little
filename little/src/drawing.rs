@@ -393,9 +393,12 @@ pub trait DrawingConvert: Sized {
 	fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self>;
 }
 
-pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
+pub trait Bounded<P: Pixel> {
+	fn inside(&self, pos: Vector2) -> bool;
 	fn bounded(&self, x: Vector2) -> Vector2;
-	
+}
+
+pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn blend(&mut self, x: i32, y: i32, color: TP);
 
 	fn antialiased_blend_x(&mut self, x: f32, y: i32, color: TP);
@@ -415,8 +418,8 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
 	
-	fn transform(&mut self, pos: Vector2, scale: Vector2f, angle: i32, skew: i32);
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
+	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B);
 	fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP>;
 }
 
@@ -430,7 +433,11 @@ impl<S: Buffer + Sized> DrawingConvert for S {
 	}
 }
 
-impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {
+impl<S: Buffer> Bounded<S::Format> for S {
+	fn inside(&self, pos: Vector2) -> bool {
+		!(pos.x < 0 || pos.y < 0) && pos.x < self.width() && pos.y < self.height()
+	}
+	
 	fn bounded(&self, mut x: Vector2) -> Vector2 {
 		if x.x < 0 {
 			x.x = 0;
@@ -446,7 +453,9 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 
 		x
 	}
+}
 
+impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {
 	fn blend(&mut self, x: i32, y: i32, color: TP) {
 		if color.soft() {
 			let t = color.soft_blend();
@@ -648,10 +657,6 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn transform(&mut self, pos: Vector2, scale: Vector2f, angle: i32, skew: i32) {
-		// let matrix = [];
-	}
-
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B) {
 		let length = to - from;
 
@@ -664,6 +669,28 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 					((y - from.y) as f32 * scale_y) as i32);
 				
 				self.blend(x, y, px)
+			}
+		}
+	}
+
+	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B) {
+		let (a, b, c, d) =
+			(scale.x * cos(angle), sin(angle),
+			-sin(angle), scale.y * cos(angle));
+
+		let e = (a*d) - (b*c);
+		let (a, b, c, d) = (a/e, b/e, c/e, d/e);
+
+		for x in 0..self.width() {
+			for y in 0..self.height() {
+				let (fx, fy) = (x as f32, y as f32);
+				let pos = vec2(
+					((fx * a) + (fx * c)) as i32 - pos.x,
+					((fy * b) + (fy * d)) as i32 - pos.y);
+				
+				if buf.inside(pos) {
+					self.blend(x, y, buf.get_pixel(pos.x, pos.y));
+				}
 			}
 		}
 	}
