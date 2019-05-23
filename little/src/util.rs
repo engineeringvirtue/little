@@ -104,7 +104,7 @@ pub fn rotation_2d(angle: f32) -> Matrix2d {
     )
 }
 
-pub fn rotate(pos: Matrix2d, angle: f32) -> Vector2 {
+pub fn rotate(pos: Vector2f, angle: f32) -> Vector2 {
     let a: Matrix2d = rotation_2d(angle);
     a * pos
 }
