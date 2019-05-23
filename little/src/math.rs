@@ -1,9 +1,5 @@
 use core::intrinsics::*;
 
-pub fn transmute<T>(b: &[u8]) -> T {
-	unsafe { core::ptr::read(b.as_ptr() as *const T) }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2 { pub x: i32, pub y: i32 }
 
@@ -15,7 +11,7 @@ pub struct Matrix2d { pub a: f32, pub b: f32, pub c: f32, pub d: f32 }
 
 macro_rules! impl_math {
 	($name: ident, $($field: ident),+) => {
-		impl core::ops::Add<Self> for $name {
+		impl core::ops::Add for $name {
 			type Output = Self;
 
 			fn add(self, other: Self) -> Self {
@@ -23,13 +19,13 @@ macro_rules! impl_math {
 			}
 		}
 		
-		impl core::ops::AddAssign<Self> for $name {		
+		impl core::ops::AddAssign for $name {		
 			fn add_assign(&mut self, x: Self) {
 				$(self.$field += x.$field;)*
 			}
 		}
 		
-		impl core::ops::Sub<Self> for $name {
+		impl core::ops::Sub for $name {
 			type Output = Self;
 
 			fn sub(self, other: Self) -> Self {
@@ -37,13 +33,13 @@ macro_rules! impl_math {
 			}
 		}
 		
-		impl core::ops::SubAssign<Self> for $name {		
+		impl core::ops::SubAssign for $name {		
 			fn sub_assign(&mut self, x: Self) {
 				$(self.$field -= x.$field;)*
 			}
 		}
 
-		impl core::ops::Div<Self> for $name {
+		impl core::ops::Div for $name {
 			type Output = Self;
 
 			fn div(self, other: Self) -> Self {
@@ -51,13 +47,13 @@ macro_rules! impl_math {
 			}
 		}
 		
-		impl core::ops::DivAssign<Self> for $name {		
+		impl core::ops::DivAssign for $name {		
 			fn div_assign(&mut self, x: Self) {
 				$(self.$field /= x.$field;)*
 			}
 		}
 
-		impl core::ops::Rem<Self> for $name {
+		impl core::ops::Rem for $name {
 			type Output = Self;
 
 			fn rem(self, other: Self) -> Self {
@@ -65,9 +61,69 @@ macro_rules! impl_math {
 			}
 		}
 		
-		impl core::ops::RemAssign<Self> for $name {		
+		impl core::ops::RemAssign for $name {		
 			fn rem_assign(&mut self, x: Self) {
 				$(self.$field %= x.$field;)*
+			}
+		}
+	};
+}
+
+macro_rules! impl_math_single {
+	($name: ident, $other: ident, $($field: ident),+) => {
+		impl core::ops::Add<$other> for $name {
+			type Output = Self;
+
+			fn add(self, other: $other) -> Self {
+				$name {$($field: self.$field + other),*}
+			}
+		}
+		
+		impl core::ops::AddAssign<$other> for $name {		
+			fn add_assign(&mut self, x: $other) {
+				$(self.$field += x;)*
+			}
+		}
+		
+		impl core::ops::Sub<$other> for $name {
+			type Output = Self;
+
+			fn sub(self, other: $other) -> Self {
+				$name {$($field: self.$field - other),*}
+			}
+		}
+		
+		impl core::ops::SubAssign<$other> for $name {		
+			fn sub_assign(&mut self, x: $other) {
+				$(self.$field -= x;)*
+			}
+		}
+
+		impl core::ops::Div<$other> for $name {
+			type Output = Self;
+
+			fn div(self, other: $other) -> Self {
+				$name {$($field: self.$field / other),*}
+			}
+		}
+		
+		impl core::ops::DivAssign<$other> for $name {		
+			fn div_assign(&mut self, x: $other) {
+				$(self.$field /= x;)*
+			}
+		}
+
+		impl core::ops::Rem<$other> for $name {
+			type Output = Self;
+
+			fn rem(self, other: $other) -> Self {
+				$name {$($field: self.$field % other),*}
+			}
+		}
+		
+		impl core::ops::RemAssign<$other> for $name {		
+			fn rem_assign(&mut self, x: $other) {
+				$(self.$field %= x;)*
 			}
 		}
 	};
@@ -76,6 +132,12 @@ macro_rules! impl_math {
 impl Into<Vector2f> for Vector2 {
 	fn into(self) -> Vector2f {
 		vec2f(self.x as f32, self.y as f32)
+	}
+}
+
+impl Into<Vector2> for Vector2f {
+	fn into(self) -> Vector2 {
+		vec2(self.x as i32, self.y as i32)
 	}
 }
 
@@ -91,6 +153,10 @@ impl core::ops::Mul<Matrix2d> for Vector2f {
 impl_math!(Vector2, x, y);
 impl_math!(Vector2f, x, y);
 impl_math!(Matrix2d, a, b, c, d);
+
+impl_math_single!(Vector2, i32, x, y);
+impl_math_single!(Vector2f, f32, x, y);
+impl_math_single!(Matrix2d, f32, a, b, c, d);
 
 pub fn vec2(x: i32, y: i32) -> Vector2 {
 	Vector2 {x, y}

@@ -1,6 +1,5 @@
 use super::*;
-use core::{mem, ptr};
-use math::transmute;
+use core::mem;
 
 pub trait Pixel: Clone {
 	fn soft(&self) -> bool;
@@ -674,19 +673,16 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 	}
 
 	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B) {
-		let (a, b, c, d) =
-			(scale.x * cos(angle), sin(angle),
-			-sin(angle), scale.y * cos(angle));
+		let mat =
+			mat2(scale.x * cos(angle), sin(angle),
+				-sin(angle), scale.y * cos(angle));
 
-		let e = (a*d) - (b*c);
-		let (a, b, c, d) = (a/e, b/e, c/e, d/e);
+		let e = (mat.a*mat.d) - (mat.b*mat.c);
+		let mat = mat / e;
 
 		for x in 0..self.width() {
 			for y in 0..self.height() {
-				let (fx, fy) = (x as f32, y as f32);
-				let pos = vec2(
-					( as i32 - pos.x,
-					( as i32 - pos.y);
+				let pos = <Vector2f as Into<Vector2>>::into(vec2f(x as f32, y as f32) * mat) - pos;
 				
 				if buf.inside(pos) {
 					self.blend(x, y, buf.get_pixel(pos.x, pos.y));
