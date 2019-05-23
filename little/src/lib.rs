@@ -1,8 +1,11 @@
 #![no_std]
 #![feature(core_intrinsics)]
 
-pub mod util;
-pub use util::*;
+pub mod math;
+pub use math::*;
+
+pub mod region;
+pub use region::Region;
 
 pub mod drawing;
 pub mod input;

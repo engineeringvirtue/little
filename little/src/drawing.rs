@@ -1,6 +1,6 @@
 use super::*;
 use core::{mem, ptr};
-use util::transmute;
+use math::transmute;
 
 pub trait Pixel: Clone {
 	fn soft(&self) -> bool;
@@ -685,8 +685,8 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 			for y in 0..self.height() {
 				let (fx, fy) = (x as f32, y as f32);
 				let pos = vec2(
-					((fx * a) + (fx * c)) as i32 - pos.x,
-					((fy * b) + (fy * d)) as i32 - pos.y);
+					( as i32 - pos.x,
+					( as i32 - pos.y);
 				
 				if buf.inside(pos) {
 					self.blend(x, y, buf.get_pixel(pos.x, pos.y));
