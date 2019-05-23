@@ -7,6 +7,7 @@ pub fn transmute<T>(b: &[u8]) -> T {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2 { pub x: i32, pub y: i32 }
+pub struct Matrix2d { pub a: f32, pub b: f32, pub c: f32, pub d: f32 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2f { pub x: f32, pub y: f32 }
@@ -37,6 +38,13 @@ impl core::ops::Add<Vector2> for Vector2 {
 	fn add(self, rhs: Vector2) -> Vector2 {
 		Vector2 {x: self.x + rhs.x, y: self.y + rhs.y}
 	}
+}
+
+pub fn mat2(a: f32, b: f32, c: f32, d: f32) -> Matrix2d {
+    Matrix2d {
+        a, b,
+        c, d
+    }
 }
 
 pub fn vec2(x: i32, y: i32) -> Vector2 {
@@ -84,4 +92,19 @@ pub fn ceil(f: f32) -> f32 {
 
 pub fn pow(f: f32, x: f32) -> f32 {
 	unsafe { powf32(f, x) }
+}
+
+pub fn rotation_2d(angle: f32) -> Matrix2d {
+    let s: f32 = sin(angle);
+    let c: f32 = cos(angle);
+
+    mat2(
+    	c, -s,
+    	s, c
+    )
+}
+
+pub fn rotate(pos: Matrix2d, angle: f32) -> Vector2 {
+    let a: Matrix2d = rotation_2d(angle);
+    a * pos
 }
