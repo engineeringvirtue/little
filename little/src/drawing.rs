@@ -409,7 +409,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
 	fn line(&mut self, from: Vector2, to: Vector2, color: &TP, thickness: i32);
-	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, thickness: i32, color: &TP);
+	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP);
 	
 	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
 	fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP);
@@ -417,6 +417,9 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
 	
+    	fn circle(x: i32, y: i32, r: f32, color: &TP);
+    	fn circle_sector(center: Vector2, r: f32, start: i32, end: i32, seg: i32, color: &TP);
+
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
 	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B);
 	fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP>;
@@ -560,7 +563,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, thickness: i32, color: &TP) {
+	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP) {
 
 	}
 
@@ -570,6 +573,14 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 				self.blend(x, y, color.clone());
 			}
 		}
+	}
+
+	fn circle(center: Vector2, r: f32, color: &TP) {
+        	circle_sector(center, r, 0, 360, 36, color);
+	}
+
+    	fn circle_sector(center: Vector2, r: f32, start: i32, end: i32, seg: i32, color: &TP) {
+	
 	}
 
 	fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP) {
