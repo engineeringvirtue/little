@@ -573,11 +573,12 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 	}
 
 	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP) {
-		let hh: i32 = height * height;
-		let ww: i32 = width * width;
-		let hhww: i32 = hh * ww;
-		let mut x0: i32 = width;
-		let mut dx: i32 = 0;
+		let hh = height * height;
+		let ww = width * width;
+		let hhww = hh * ww;
+
+		let mut x0 = width;
+		let mut dx = 0;
 
 		for x in -width..width {
 			self.blend(origin.x + x, origin.y, color.clone());
@@ -586,11 +587,14 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		for y in 1..height {
 			let mut x1 = x0 - (dx - 1);
 
-			for x in (0..x1).into_iter().rev() {
-				if (x*x*hh) + (y*y*ww) <= hhww {
-					x1 = x;
+			loop {
+				if ((x1*x1*hh) + (y*y*ww) <= hhww) || x1 < 0 {
+					break;
 				}
-			};
+
+				x1 -= 1;
+			}
+
 			//im extremely skeptical at this point
 			dx = x0 - x1;
 			x0 = x1;
