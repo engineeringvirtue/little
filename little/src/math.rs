@@ -141,12 +141,12 @@ impl Into<Vector2> for Vector2f {
 	}
 }
 
-impl core::ops::Mul<Matrix2d> for Vector2f {
+impl core::ops::Mul<Vector2f> for Matrix2d {
 	type Output = Vector2f;
 
-	fn mul(self, other: Matrix2d) -> Self {
-		vec2f((self.x * other.a) + (self.x * other.c),
-			(self.y * other.b) + (self.y * other.d))
+	fn mul(self, other: Vector2f) -> Vector2f {
+		vec2f((other.x * self.a) + (other.x * self.c),
+			(other.y * self.b) + (other.y * self.d))
 	}
 }
 
@@ -173,19 +173,21 @@ pub fn mat2(a: f32, b: f32, c: f32, d: f32) -> Matrix2d {
     }
 }
 
-pub fn rotation_2d(angle: f32) -> Matrix2d {
-    let s: f32 = sin(angle);
-    let c: f32 = cos(angle);
+impl Matrix2d {
+	pub fn invert(self) -> Self {
+		let e = (self.a*self.d) - (self.b*self.c);
+		self / e
+	}
 
-    mat2(
-    	c, -s,
-    	s, c
-    )
-}
+	pub fn rotation(angle: f32) -> Matrix2d {
+		let s = sin(angle);
+		let c = cos(angle);
 
-pub fn rotate(pos: Vector2f, angle: f32) -> Vector2f {
-    let a: Matrix2d = rotation_2d(angle);
-    pos * a
+		mat2(
+			c, -s,
+			s, c
+		)
+	}
 }
 
 pub fn cos(f: f32) -> f32 {

@@ -13,7 +13,7 @@ include_font!(QUESTRIAL, "../assets/Questrial/Questrial-Regular.rc");
 
 fn main() {
 	let mut platform = little_opengl::OpenGLPlatform::init();
-	
+
 	{
 		let surface = platform.surface();
 

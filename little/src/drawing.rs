@@ -584,19 +584,13 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 
 		for y in 1..height {
-			let mut x1: i32 = x0 - (dx - 1);
+			let mut x1 = x0 - (dx - 1);
 
 			for x in (0..x1).into_iter().rev() {
-				//wait is the var supposed to be x1? idk
-				//OH WAIT YOU WANT TO SET X1
-				//imo debug and step through, since you cant print here :)
-				//fyi theres a gdb extension for vscode :^)))
 				if (x*x*hh) + (y*y*ww) <= hhww {
-					//lemme test on a repl this im curious
 					x1 = x;
-					break;
 				}
-			}
+			};
 			//im extremely skeptical at this point
 			dx = x0 - x1;
 			x0 = x1;
@@ -698,19 +692,14 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 	}
 
 	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B) {
-		let mat =
-			mat2(scale.x * cos(angle), sin(angle),
-				-sin(angle), scale.y * cos(angle));
+		let mat = Matrix2d::rotation(angle);
 
-		let e = (mat.a*mat.d) - (mat.b*mat.c);
-		let mat = mat / e;
-
-		for x in 0..self.width() {
-			for y in 0..self.height() {
-				let pos = <Vector2f as Into<Vector2>>::into(vec2f(x as f32, y as f32) * mat) - pos;
+		for x in 0..buf.width() {
+			for y in 0..buf.height() {
+				let pos = <Vector2f as Into<Vector2>>::into(mat * vec2f(x as f32, y as f32)) + pos;
 				
 				if buf.inside(pos) {
-					self.blend(x, y, buf.get_pixel(pos.x, pos.y));
+					self.blend(pos.x, pos.y, buf.get_pixel(x, y));
 				}
 			}
 		}
