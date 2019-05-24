@@ -412,13 +412,10 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP);
 	
 	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
-	fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP);
-	
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP);
+
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
-	
-    fn circle(x: i32, y: i32, r: f32, color: &TP);
-    fn circle_sector(center: Vector2, r: f32, start: i32, end: i32, seg: i32, color: &TP);
 
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
 	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B);
@@ -575,26 +572,43 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn circle(center: Vector2, r: f32, color: &TP) {
-        self.circle_sector(center, r, 0, 360, 36, color);
-    }
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP) {
+		let hh: i32 = height * height;
+		let ww: i32 = width * width;
+		let hhww: i32 = hh * ww;
+		let mut x0: i32 = width;
+		let mut dx: i32 = 0;
 
-    fn circle_sector(center: Vector2, r: f32, start: i32, end: i32, seg: i32, color: &TP) {
-        
-    }
+		for x in -width..width {
+			self.blend(origin.x + x, origin.y, color.clone());
+		}
 
-	fn ellipse(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, color: &TP) {
-		let (h, w) = (to.y - from.y, to.x - from.x);
+		for y in 1..height {
+			let mut x1: i32 = x0 - (dx - 1);
 
-		for y in 0..h {
-			for x in 0..w {
-				if (x*x*h*h) + (y*y*w*w) <= h*h*w*w {
-					self.blend(from.x + x, from.y + y, color.clone());
+			for x in (0..x1).into_iter().rev() {
+				//wait is the var supposed to be x1? idk
+				//OH WAIT YOU WANT TO SET X1
+				//imo debug and step through, since you cant print here :)
+				//fyi theres a gdb extension for vscode :^)))
+				if (x*x*hh) + (y*y*ww) <= hhww {
+					//lemme test on a repl this im curious
+					x1 = x;
+					break;
 				}
+			}
+			//im extremely skeptical at this point
+			dx = x0 - x1;
+			x0 = x1;
+			//rust ranges only go up i think thats the only thing that could go wrong here
+			for x in -x0..x0 {
+				self.blend(origin.x + x, origin.y - y, color.clone());
+				//OwO
+				self.blend(origin.x + x, origin.y + y, color.clone());
 			}
 		}
 	}
-	
+
 	fn triangle(&mut self, mut points: [Vector2; 3], color: &TP) {
 		points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
