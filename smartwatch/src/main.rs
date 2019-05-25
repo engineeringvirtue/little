@@ -19,8 +19,6 @@ fn main() {
 		let questrial = QUESTRIAL;
 
 		let rainy = RAINY;
-            
-        let mut x: i32 = 50;
 
 		surface.rect(vec2(0, 0), vec2(128, 128), &RGB(0, 0, 0));
 
