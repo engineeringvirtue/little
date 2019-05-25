@@ -581,7 +581,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		let mut dx = 0;
 
 		for x in -width..width {
-			self.blend(origin.x + x, origin.y, color.clone());
+			self.blend((origin.x + width)-2, origin.y, color.clone());
 		}
 
 		for y in 1..height {
@@ -600,7 +600,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 			x0 = x1;
 			//rust ranges only go up i think thats the only thing that could go wrong here
 			for x in -x0..x0 {
-				self.blend(origin.x + x, origin.y - y, color.clone());
+				self.blend(origin.x + x, (origin.y - y)+2, color.clone());
 				//OwO
 				self.blend(origin.x + x, origin.y + y, color.clone());
 			}
