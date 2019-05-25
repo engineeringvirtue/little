@@ -580,29 +580,44 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		let mut x0 = width;
 		let mut dx = 0;
 
-		for x in -width..width {
-			self.blend((origin.x + width)-2, origin.y, color.clone());
-		}
+		//lol how does this work? this block looks useless
+		//also uhh x isnt being used here so i dont really see how this block actually contributes to the circle
+		//:thinking: lol
+		// for x in -width..width {
+		// }
+		//alt + arrow
+		//alt +shift + arrow duplicates
+		// :)
+		self.blend((origin.x + width)-2, origin.y, color.clone());
 
 		for y in 1..height {
 			let mut x1 = x0 - (dx - 1);
 
-			loop {
-				if ((x1*x1*hh) + (y*y*ww) <= hhww) || x1 < 0 {
-					break;
+			let dist = loop {
+				//i believe you should be able to just modify this to get the distance and check that here and save time downwards
+				//i-i think so
+				let dist = hhww - ((x1*x1*hh) + (y*y*ww));
+				//that should work, i thonke
+				if dist > 0 || x1 < 0 {
+					break dist;
 				}
 
 				x1 -= 1;
-			}
+			};
 
-			//im extremely skeptical at this point
 			dx = x0 - x1;
 			x0 = x1;
-			//rust ranges only go up i think thats the only thing that could go wrong here
-			for x in -x0..x0 {
-				self.blend(origin.x + x, (origin.y - y)+2, color.clone());
-				//OwO
-				self.blend(origin.x + x, origin.y + y, color.clone());
+
+			//right, so we need the x as a float, distance to the nearest integer on the circle
+			// self.antialiased_blend_x_dir(origin.x + -x0, (origin.y - y)+2, false, color.clone());
+			// self.antialiased_blend_x_dir(origin.x + x0, (origin.y - y)+2, true, color.clone());
+			// self.antialiased_blend_x_dir(origin.x + -x0, origin.y + y, false, color.clone());
+			// self.antialiased_blend_x_dir(origin.x + x0,  origin.y + y, true, color.clone());
+			
+			for x in -x0+1..x0-1 {
+				self.blend(origin.x + x, (origin.y - y)+2, color.clone().mult(dist as f32 / 2 as f32));
+				//OwO OOF
+				self.blend(origin.x + x, origin.y + y, color.clone().mult(dist as f32 / 2 as f32));
 			}
 		}
 	}
@@ -653,13 +668,13 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		if points[0].y == points[1].y {
 			flat_triangle(points[2], points[0], points[1], true);
 		} else if points[1].y == points[2].y {
-			// flat_triangle(points[0], points[1], points[2], false);
+			flat_triangle(points[0], points[1], points[2], false);
 		} else {
 			//hard math you can find it here http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-			// let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
+			let mid = vec2(points[0].x + (((points[1].y - points[0].y) as f32 / (points[2].y - points[0].y) as f32) * (points[2].x - points[0].x) as f32) as i32, points[1].y);
 			
-			// flat_triangle(points[0], mid, points[1], false);
-			// flat_triangle(points[2], mid, points[1], true);
+			flat_triangle(points[0], mid, points[1], false);
+			flat_triangle(points[2], mid, points[1], true);
 		}
 	}
 
