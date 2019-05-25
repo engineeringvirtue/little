@@ -5,7 +5,6 @@ use little::*;
 use little::input::*;
 use little::drawing::{RGB, RGBA, Drawing, Bounded, DrawText, FontBuffer, CharBuffer};
 use little::{Vector2, vec2};
-use little::{Matrix2d, mat2};
 
 include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
 include_buffer!(EHEHE, RGBA, "../assets/ehehe.rc");
@@ -20,12 +19,15 @@ fn main() {
 		let questrial = QUESTRIAL;
 
 		let rainy = RAINY;
+            
+        let mut x: i32 = 50;
 
 		surface.rect(vec2(0, 0), vec2(128, 128), &RGB(0, 0, 0));
 
 		// surface.triangle([vec2(0, 0), vec2(127, 0), vec2(127, 127)], &RGBA(0, 0, 0, 100));
 		//surface.copy_transform(vec2(-20, 0), vec2f(1.0, 1.0), 45.0, vec2f(0.0, 0.0), &RAINY);
-		surface.ellipse(vec2(50, 50), 40, 40, &RGB(0, 255, 0));
+
+        surface.ellipse(vec2(50, 50), 20, 20, &RGB(0, 255, 0));
 		// surface.ellipse(&vec2(50, 50), &vec2(128, 128), &RGB(0, 255, 0));
 		// surface.text(&DrawText::new(&questrial, "10:10").font_size(1.3), vec2(10, 40), vec2(128,50), &RGBA(0, 0, 0, 255));
 		// surface.line(vec2(0, 0), vec2(100, 128), &RGBA(0,0,0,255), 4);
@@ -35,6 +37,7 @@ fn main() {
 	}
 
 	loop {
+
 		if platform.step() {
 			break;
 		}
