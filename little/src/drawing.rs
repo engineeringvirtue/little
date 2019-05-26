@@ -412,7 +412,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP);
 	
 	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP);
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, A: i32, color: &TP);
 
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
@@ -572,52 +572,56 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP) {
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, A: i32, color: &TP) {
+		fn dist(r: f32, y: f32) -> f32 {
+			let x = sqrt(r*r-y*y);
+			ceil(x) - x
+		}
+
 		let hh = height * height;
 		let ww = width * width;
 		let hhww = hh * ww;
 
 		let mut x0 = width;
 		let mut dx = 0;
+		
+		let mut x2 = width;
+		let mut y2 = 0;
+		let mut d = 0.0f32;
 
-		//lol how does this work? this block looks useless
-		//also uhh x isnt being used here so i dont really see how this block actually contributes to the circle
-		//:thinking: lol
-		// for x in -width..width {
-		// }
-		//alt + arrow
-		//alt +shift + arrow duplicates
-		// :)
-		self.blend((origin.x + width)-2, origin.y, color.clone());
+		self.blend((origin.x + width)-5, origin.y, color.clone());
+
+		while x2 > y2 {
+			y2 += 1;
+			
+			if dist(width as f32, y2 as f32) < d {
+				x2 -= 1;
+			}
+			
+			self.blend((origin.x + x2)-1, origin.y + y2, color.clone().mult(A as f32*(1.0f32-dist(width as f32, y2 as f32))));
+			self.blend((origin.x + x2)-1, origin.y + y2, color.clone().mult(A as f32*dist(width as f32, y2 as f32)));
+
+			d = dist(width as f32, y2 as f32);
+		}
 
 		for y in 1..height {
-			let mut x1 = x0 - (dx - 1);
+			let mut x1 = x0 + 1;
 
-			let dist = loop {
-				//i believe you should be able to just modify this to get the distance and check that here and save time downwards
-				//i-i think so
-				let dist = hhww - ((x1*x1*hh) + (y*y*ww));
-				//that should work, i thonke
-				if dist > 0 || x1 < 0 {
-					break dist;
+			loop {
+				if (x1*x1*hh) + (y*y*ww) < hhww {
+					break;
 				}
 
 				x1 -= 1;
 			};
 
-			dx = x0 - x1;
+			dx = -1;
 			x0 = x1;
 
-			//right, so we need the x as a float, distance to the nearest integer on the circle
-			// self.antialiased_blend_x_dir(origin.x + -x0, (origin.y - y)+2, false, color.clone());
-			// self.antialiased_blend_x_dir(origin.x + x0, (origin.y - y)+2, true, color.clone());
-			// self.antialiased_blend_x_dir(origin.x + -x0, origin.y + y, false, color.clone());
-			// self.antialiased_blend_x_dir(origin.x + x0,  origin.y + y, true, color.clone());
-			
-			for x in -x0+1..x0-1 {
-				self.blend(origin.x + x, (origin.y - y)+2, color.clone().mult(dist as f32 / 2 as f32));
+			for x in -x0..x0 {
+				self.blend(origin.x + x, (origin.y - y)+1, color.clone());
 				//OwO OOF
-				self.blend(origin.x + x, origin.y + y, color.clone().mult(dist as f32 / 2 as f32));
+				self.blend(origin.x + x, origin.y + y, color.clone());
 			}
 		}
 	}
