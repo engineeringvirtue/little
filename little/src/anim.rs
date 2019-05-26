@@ -4,10 +4,15 @@
 // d = total time it should take to complete (duration basically)
 
 use super::*;
+use io::GlobalTime;
 use core::f32::consts::PI;
 
-pub trait GlobalTime {
-	fn get_time(&self) -> f32;
+pub trait GetAtTime {
+	fn get(&self, t: f32) -> f32;
+
+	fn get_gt<T: GlobalTime>(&self, gt: &T) -> f32 {
+		self.get(gt.get_s())
+	}
 }
 
 pub enum Easing {
@@ -42,12 +47,14 @@ impl Animation {
 	
 	pub fn new_gt<T: GlobalTime>(gt: &T, off: f32, dur: f32, from: f32, to: f32, easing: Easing) -> Self {
 		Animation {
-			offset: gt.get_time() + off,
+			offset: gt.get_s() + off,
 			duration: dur, from, to, easing
 		}
 	}
+}
 
-	pub fn get(&self, mut t: f32) -> f32 {
+impl GetAtTime for Animation {
+	fn get(&self, mut t: f32) -> f32 {
 		t += self.offset;
 		let (c, d, b) = (self.to, self.duration, self.from);
 
@@ -231,8 +238,15 @@ impl Animation {
 			}
 		}
 	}
+}
 
-	pub fn get_gt<T: GlobalTime>(&self, gt: &T) -> f32 {
-		self.get(gt.get_time())
+pub struct LoopingAnimation {
+	pub anim: Animation
+}
+
+impl GetAtTime for LoopingAnimation {
+	fn get(&self, t: f32) -> f32 {
+		let t = abs(self.anim.duration - t%(self.anim.duration*2.0));
+		self.anim.get(t)
 	}
 }

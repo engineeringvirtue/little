@@ -8,3 +8,4 @@ edition = "2018"
 little = {path = "../little"}
 glutin = "0.21.0"
 gl = "0.12.0"
+mio = "0.6.18"

@@ -202,6 +202,10 @@ pub fn sqrt(f: f32) -> f32 {
 	unsafe { sqrtf32(f) }
 }
 
+// pub fn atan() -> f32 {
+// 	HAYMAN
+// }
+
 pub fn abs(f: f32) -> f32 {
 	unsafe { fabsf32(f) }
 }

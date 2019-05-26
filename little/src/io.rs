@@ -68,6 +68,18 @@ pub trait TouchInput {
 	fn touch_step(&mut self) -> &TouchInputState;
 }
 
-pub trait DebugInput {
-	fn debug_step(&mut self) -> Option<usize>;
+pub trait GlobalTime {
+	fn get_ms(&self) -> usize;
+	fn get_s(&self) -> f32;
+
+	fn reset(&mut self);
+}
+
+pub trait BluetoothIO {
+	fn discover(&mut self);
+	fn disconnect(&mut self);
+	fn connected(&self) -> bool;
+
+	fn send(&mut self, data: &[u8]);
+	fn recieve(&mut self) -> (usize, [u8; 1024]);
 }

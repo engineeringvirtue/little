@@ -1,5 +1,8 @@
+#![feature(duration_float)]
+
 extern crate glutin;
 extern crate gl;
+extern crate mio;
 
 extern crate little;
 
@@ -7,13 +10,17 @@ use glutin::*;
 use gl::*;
 use gl::types::*;
 
+use std::time::Instant;
 use std::ffi::{CString, CStr, c_void};
 use std::ptr::null_mut;
 use std::mem;
 
+use mio::net::TcpStream;
+use std::io::{Read, Write};
+
 use little::*;
 use drawing::{*, RGB};
-use input::*;
+use io::*;
 
 fn cstr(s: &str) -> CString {
 	CString::new(s).unwrap()
@@ -46,17 +53,16 @@ unsafe fn shader_err(shad: GLuint) -> Result<(), GLint> {
 	}
 }
 
-const WIDTH: i32 = 128;
-const HEIGHT: i32 = 128;
-
 pub struct TextureSurface {
-	pixels: [u8; 128*128*3]
+	pixels: Vec<u8>,
+	w: i32, h: i32
 }
 
 impl TextureSurface {
-	fn new() -> Self {
+	fn new(w: i32, h: i32) -> Self {
 		TextureSurface {
-			pixels: [0; (WIDTH*HEIGHT*3) as usize]
+			pixels: vec![0; (w*h*3) as usize],
+			w, h
 		}
 	}
 }
@@ -65,22 +71,22 @@ impl Buffer for TextureSurface {
 	type Format = RGB;
 
 	fn width(&self) -> i32 {
-		WIDTH
+		self.w
 	}
 
 	fn height(&self) -> i32 {
-		WIDTH
+		self.h
 	}
 
 	fn get_pixel(&self, x: i32, y: i32) -> RGB {
-		let pos = ((y * WIDTH * 3) + (x * 3)) as usize;
+		let pos = ((y * self.w * 3) + (x * 3)) as usize;
 		RGB(self.pixels[pos], self.pixels[pos + 1], self.pixels[pos + 2])
 	}
 }
 
 impl WriteBuffer for TextureSurface {
 	fn set_pixel(&mut self, x: i32, y: i32, color: RGB) {
-		let pos = ((y * WIDTH * 3) + (x * 3)) as usize;
+		let pos = ((y * self.w * 3) + (x * 3)) as usize;
 		
 		self.pixels[pos] = color.0;
 		self.pixels[pos+1] = color.1;
@@ -94,6 +100,11 @@ pub struct OpenGLPlatform {
 	touch_state: TouchInputState,
 	mouse_pos: Vector2,
 	mouse_down: bool,
+
+	start_inst: Instant,
+
+	bluetooth_stream: TcpStream,
+	bluetooth_connected: bool,
 
 	glutin_ctx: WindowedContext<PossiblyCurrent>,
 	event_loop: EventsLoop,
@@ -113,6 +124,10 @@ const VERTS: [f32; 24] = [
 	-1.0, -1.0, 0.0, 1.0,
 	-1.0, 1.0, 0.0, 0.0
 ];
+
+const WIDTH: i32 = 128;
+const HEIGHT: i32 = 128;
+const ADDR: &str = "127.0.0.1:8085";
 
 impl Platform<TextureSurface> for OpenGLPlatform {
 	fn init() -> Self {
@@ -210,11 +225,18 @@ void main()
 			TexParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST as _);
 			TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST as _);
 
+			let stream = TcpStream::connect(&ADDR.parse().unwrap()).unwrap();
+
 			OpenGLPlatform {
-				surface: TextureSurface::new(),
+				surface: TextureSurface::new(WIDTH, HEIGHT),
 
 				touch_state: TouchInputState::new(10),
 				mouse_pos: vec2(0,0), mouse_down: false,
+				
+				start_inst: Instant::now(),
+				
+				bluetooth_stream: stream,
+				bluetooth_connected: false,
 				
 				glutin_ctx: context, event_loop: ev,
 				program, tex_attrib, frag_s, vert_s, vbo, vao
@@ -290,5 +312,44 @@ void main()
 impl TouchInput for OpenGLPlatform {
 	fn touch_step(&mut self) -> &TouchInputState {
 		&self.touch_state
+	}
+}
+
+impl GlobalTime for OpenGLPlatform {
+	fn get_ms(&self) -> usize {
+		self.start_inst.elapsed().as_millis() as usize
+	}
+
+	fn get_s(&self) -> f32 {
+		self.start_inst.elapsed().as_secs_f32()
+	}
+
+	fn reset(&mut self) {
+		self.start_inst = Instant::now();
+	}
+}
+
+impl BluetoothIO for OpenGLPlatform {
+	fn discover(&mut self) {
+		self.bluetooth_connected = true;
+	}
+
+	fn disconnect(&mut self) {
+		self.bluetooth_connected = false;
+	}
+
+	fn connected(&self) -> bool {
+		self.bluetooth_connected
+	}
+
+	fn send(&mut self, data: &[u8]) {
+		self.bluetooth_stream.write(data).unwrap();
+	}
+
+	fn recieve(&mut self) -> (usize, [u8; 1024]) {
+		let mut buf = [0; 1024];
+		let x = self.bluetooth_stream.read(&mut buf).unwrap();
+
+		(x, buf)
 	}
 }

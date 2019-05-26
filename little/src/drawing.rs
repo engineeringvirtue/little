@@ -392,11 +392,6 @@ pub trait DrawingConvert: Sized {
 	fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self>;
 }
 
-pub trait Bounded<P: Pixel> {
-	fn inside(&self, pos: Vector2) -> bool;
-	fn bounded(&self, x: Vector2) -> Vector2;
-}
-
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn blend(&mut self, x: i32, y: i32, color: TP);
 
@@ -432,26 +427,26 @@ impl<S: Buffer + Sized> DrawingConvert for S {
 	}
 }
 
-impl<S: Buffer> Bounded<S::Format> for S {
+impl<S: Buffer> Bounded for S {
 	fn inside(&self, pos: Vector2) -> bool {
 		!(pos.x < 0 || pos.y < 0) && pos.x < self.width() && pos.y < self.height()
 	}
 	
-	fn bounded(&self, mut x: Vector2) -> Vector2 {
-		if x.x < 0 {
-			x.x = 0;
-		} else if x.x > self.width() {
-			x.x = self.width();
-		}
+	// fn bounded(&self, mut x: Vector2) -> Vector2 {
+	// 	if x.x < 0 {
+	// 		x.x = 0;
+	// 	} else if x.x > self.width() {
+	// 		x.x = self.width();
+	// 	}
 		
-		if x.y < 0 {
-			x.y = 0;
-		} else if x.y > self.height() {
-			x.y = self.height();
-		}
+	// 	if x.y < 0 {
+	// 		x.y = 0;
+	// 	} else if x.y > self.height() {
+	// 		x.y = self.height();
+	// 	}
 
-		x
-	}
+	// 	x
+	// }
 }
 
 impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {

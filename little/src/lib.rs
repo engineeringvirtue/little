@@ -1,14 +1,17 @@
 #![no_std]
 #![feature(core_intrinsics)]
 
+pub mod util;
+pub use util::*;
+
 pub mod math;
 pub use math::*;
 
 pub mod region;
-pub use region::Region;
+pub use region::{Bounded, Region};
 
 pub mod drawing;
-pub mod input;
+pub mod io;
 pub mod anim;
 
 pub fn transmute<T>(b: &[u8]) -> T {

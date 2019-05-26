@@ -1,9 +1,10 @@
 extern crate little;
 extern crate little_opengl;
 
+mod model;
+
 use little::*;
-use little::input::*;
-use little::drawing::{RGB, RGBA, Drawing, Bounded, DrawText, FontBuffer, CharBuffer};
+use little::drawing::{RGB, RGBA, Drawing, DrawText, FontBuffer, CharBuffer};
 use little::{Vector2, vec2};
 
 include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
