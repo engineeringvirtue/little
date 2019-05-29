@@ -1,6 +1,6 @@
 /target
 /little-util/target
-/little-opengl/target
+/little-emu/target
 /smartwatch/target
 **/*.rs.bk
 Cargo.lock

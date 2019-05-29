@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>../../assets/logo or something.png</file>
+        <file>../../assets/Questrial/Questrial-Regular.ttf</file>
+        <file>../../assets/Roboto/Roboto-Bold.ttf</file>
+        <file>../../assets/Roboto/Roboto-Italic.ttf</file>
+        <file>../../assets/Roboto/Roboto-Regular.ttf</file>
+        <file>components/BodyText.qml</file>
+        <file>components/Error.qml</file>
+        <file>../../assets/erricon.png</file>
+        <file>Pairing.qml</file>
+        <file>Configuration.qml</file>
+        <file>components/Statuses.qml</file>
+    </qresource>
+</RCC>

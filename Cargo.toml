@@ -1,2 +1,2 @@
 [workspace]
-members = ["little", "little-opengl", "little-cortex", "little-util", "smartwatch"]
+members = ["little", "little-emu", "little-cortex", "little-util", "smartwatch"]

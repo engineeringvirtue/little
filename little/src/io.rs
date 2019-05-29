@@ -78,8 +78,8 @@ pub trait GlobalTime {
 pub trait BluetoothIO {
 	fn discover(&mut self);
 	fn disconnect(&mut self);
-	fn connected(&self) -> bool;
+	fn connected(&mut self) -> bool;
 
 	fn send(&mut self, data: &[u8]);
-	fn recieve(&mut self) -> (usize, [u8; 1024]);
+	fn recieve(&mut self) -> Option<(usize, [u8; 1024])>;
 }

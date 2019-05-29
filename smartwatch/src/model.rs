@@ -2,7 +2,7 @@ use little::*;
 
 pub struct CoreData {
 	weather: u8,
-	date: u8,
+	date: u16,
 	hour: u8,
 	minute: u8
 }
