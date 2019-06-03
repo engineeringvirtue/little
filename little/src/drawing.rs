@@ -407,7 +407,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP);
 	
 	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, A: i32, color: &TP);
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP);
 
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
@@ -567,57 +567,70 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, A: i32, color: &TP) {
-		fn dist(r: f32, y: f32) -> f32 {
-			let x = sqrt(r*r-y*y);
-			ceil(x) - x
-		}
-
-		let hh = height * height;
-		let ww = width * width;
-		let hhww = hh * ww;
-
-		let mut x0 = width;
-		let mut dx = 0;
+	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP) {
+		let mut wx: i32;
+		let mut wy: i32;
+		let mut xa: i32;
+		let mut ya: i32;
 		
-		let mut x2 = width;
-		let mut y2 = 0;
-		let mut d = 0.0f32;
+		let asq: i32 =  width * width;
+		let bsq: i32 = height * height;
 
-		self.blend((origin.x + width)-5, origin.y, color.clone());
+		self.blend(origin.x, origin.y + height, color.clone());
+		self.blend(origin.x, origin.y - height, color.clone());
 
-		while x2 > y2 {
-			y2 += 1;
-			
-			if dist(width as f32, y2 as f32) < d {
-				x2 -= 1;
+		wx = 0;
+		wy = height;
+		xa = 0;
+		ya = asq * 2 * height;
+		
+		let mut thresh: i32 = asq / 4 - asq * origin.y;
+
+		loop {
+			thresh += xa + bsq;
+
+			if thresh >= 0 {
+				ya -= asq*2;
+				thresh -= ya;
+				wy -= 1;
 			}
-			
-			self.blend((origin.x + x2)-1, origin.y + y2, color.clone().mult(A as f32*(1.0f32-dist(width as f32, y2 as f32))));
-			self.blend((origin.x + x2)-1, origin.y + y2, color.clone().mult(A as f32*dist(width as f32, y2 as f32)));
 
-			d = dist(width as f32, y2 as f32);
+			xa += bsq * 2;
+			wx += 1;
+
+			if xa >= ya {
+				break;
+			}
+
+			self.blend(width+wx, height-wy, color.clone());
+			self.blend(width-wx, height-wy, color.clone());
+			self.blend(width+wx, height+wy, color.clone());
+			self.blend(width-wx, height+wy, color.clone());
 		}
 
-		for y in 1..height {
-			let mut x1 = x0 + 1;
+		self.blend(origin.x+width, origin.y, color.clone());
+		self.blend(origin.x-width, origin.y, color.clone());
 
-			loop {
-				if (x1*x1*hh) + (y*y*ww) < hhww {
-					break;
-				}
+		loop {
+			thresh += ya + asq;
 
-				x1 -= 1;
-			};
-
-			dx = -1;
-			x0 = x1;
-
-			for x in -x0..x0 {
-				self.blend(origin.x + x, (origin.y - y)+1, color.clone());
-				//OwO OOF
-				self.blend(origin.x + x, origin.y + y, color.clone());
+			if thresh >= 0 {
+				xa -= bsq*2;
+				thresh -= xa;
+				wx -= 1;
 			}
+
+			ya += asq * 2;
+			wy += 1;
+
+			if ya >= xa {
+				break;
+			}
+
+			self.blend(width+wx, height-wy, color.clone());
+			self.blend(width-wx, height-wy, color.clone());
+			self.blend(width+wx, height+wy, color.clone());
+			self.blend(width-wx, height+wy, color.clone());
 		}
 	}
 
@@ -625,6 +638,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		points.sort_unstable_by(|a, b| a.y.cmp(&b.y));
 
 		let mut flat_triangle = |ult: Vector2, mut left: Vector2, mut right: Vector2, top: bool| {
+				
 			if left.x > right.x {
 				mem::swap(&mut left, &mut right);
 			}

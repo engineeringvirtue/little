@@ -20,7 +20,11 @@ fn main() {
 	let questrial = QUESTRIAL;
 	let rainy = RAINY;
 
-	platform.discover();
+	surface.rect(vec2(0,0,), vec2(128,128), &RGB(0, 0, 0));
+
+	surface.ellipse(vec2(50, 50), 40, 40, &RGB(0, 255, 0));
+
+	//platform.discover();
 
 	loop {
 		if platform.connected() {
