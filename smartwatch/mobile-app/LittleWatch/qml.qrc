@@ -12,5 +12,7 @@
         <file>Pairing.qml</file>
         <file>Configuration.qml</file>
         <file>components/Statuses.qml</file>
+        <file>widgets/Core.qml</file>
+        <file>widgets/Widget.qml</file>
     </qresource>
 </RCC>

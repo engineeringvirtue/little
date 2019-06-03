@@ -335,6 +335,10 @@ impl GlobalTime for OpenGLPlatform {
 	}
 }
 
+fn no_dur() -> std::time::Duration {
+	std::time::Duration::from_secs(0)
+}
+
 impl BluetoothIO for OpenGLPlatform {
 	fn discover(&mut self) {
 		let stream = TcpStream::connect(&ADDR.parse().unwrap()).unwrap();
@@ -353,7 +357,7 @@ impl BluetoothIO for OpenGLPlatform {
 
 	fn connected(&mut self) -> bool {
 		let mut events = mio::Events::with_capacity(25);
-		self.bluetooth_poll.poll(&mut events, None).unwrap();
+		self.bluetooth_poll.poll(&mut events, Some(no_dur())).unwrap();
 		
 		for x in events {
 			if x.readiness().is_writable() {
@@ -374,7 +378,7 @@ impl BluetoothIO for OpenGLPlatform {
 
 	fn recieve(&mut self) -> Option<(usize, [u8; 1024])> {
 		let mut events = mio::Events::with_capacity(25);
-		self.bluetooth_poll.poll(&mut events, None).unwrap();
+		self.bluetooth_poll.poll(&mut events, Some(no_dur())).unwrap();
 
 		for x in events {
 			if x.readiness().is_readable() {
