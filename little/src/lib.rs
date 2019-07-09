@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(core_intrinsics)]
+#![feature(const_fn)]
 
 pub mod util;
 pub use util::*;

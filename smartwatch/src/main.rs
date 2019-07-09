@@ -6,7 +6,7 @@ mod model;
 use little::*;
 use little::io::*;
 use little::drawing::{RGB, RGBA, Drawing, DrawText, FontBuffer, CharBuffer};
-use little::{Vector2, vec2};
+use little::{deg, vec2};
 
 include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
 include_buffer!(EHEHE, RGBA, "../assets/ehehe.rc");
@@ -21,7 +21,7 @@ fn main() {
 	let rainy = RAINY;
 
 	surface.rect(vec2(0,0), vec2(128,128), &RGB(0, 0, 0), 0);
-	surface.circle(vec2(50,50), 50, &RGB(127, 127, 127));
+	surface.copy_transform(vec2(20,20), vec2f(1.0, 1.0), vec2(10, 10), deg(180.0), &rainy);
 
 	// platform.discover();
 

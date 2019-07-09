@@ -361,7 +361,11 @@ impl<'a, 'b, P: Pixel, T: Buffer<Format=P>> Buffer for DrawRegion<'a, 'b, T> {
 
 impl<'a, 'b, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawRegion<'a, 'b, T> {
 	fn set_pixel(&mut self, x: i32, y: i32, p: P) {
-		self.draw.set_pixel(self.region.from.x + x, self.region.from.y + y, p)
+		let (x, y) = (self.region.from.x + x, self.region.from.y + y);
+		//scissor
+		if x < self.region.to.x || y < self.region.to.y {
+			self.draw.set_pixel(x, y, p);
+		}
 	}
 }
 
@@ -412,7 +416,7 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn poly(&mut self, points: &[Vector2], color: &TP);
 
 	fn copy<B: Buffer<Format=TP>>(&mut self, from: Vector2, to: Vector2, buf: &B);
-	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B);
+	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, origin: Vector2, angle: f32, buf: &B);
 	fn text<F: FontBuffer>(&mut self, txt: &DrawText<F>, from: Vector2, to: Vector2, color: &TP) where u8: ToPixel<TP>;
 }
 
@@ -728,15 +732,18 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, angle: f32, skew: Vector2f, buf: &B) {
-		let mat = Matrix2d::rotation(angle);
+	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, origin: Vector2, angle: f32, buf: &B) {
+		for x in 0..self.width() {
+			for y in 0..self.height() {
+				let (fx, fy) = ((x - pos.x + origin.x) as f32, (y - pos.x + origin.y) as f32);
 
-		for x in 0..buf.width() {
-			for y in 0..buf.height() {
-				let pos = <Vector2f as Into<Vector2>>::into(mat * vec2f(x as f32, y as f32)) + pos;
+				let rx = cos(angle)*fx - sin(angle)*fy;
+ 				let ry = sin(angle)*fx + cos(angle)*fy;
+
+				let pos = vec2(rx as i32 - origin.x + pos.x, ry as i32 - origin.y + pos.y);
 				
 				if buf.inside(pos) {
-					self.blend(pos.x, pos.y, buf.get_pixel(x, y));
+					self.blend(x, y, buf.get_pixel(pos.x, pos.y));
 				}
 			}
 		}

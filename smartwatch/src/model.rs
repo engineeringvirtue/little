@@ -13,4 +13,5 @@ pub struct Preferences {
 
 pub enum Widget {
 	Core,
+	Blank
 }

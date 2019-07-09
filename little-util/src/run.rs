@@ -57,7 +57,6 @@ pub fn run() -> Result<i32> {
 				let glyph = face.glyph();
 				let bmp = glyph.bitmap();
 
-
 				for c2 in DEFAULT_CHARS.chars() {
 					let k = face.get_kerning(c as u32, c2 as u32, face::KerningMode::KerningDefault)?;
 
