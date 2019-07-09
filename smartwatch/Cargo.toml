@@ -7,7 +7,3 @@ edition = "2018"
 [dependencies]
 little = {path = "../little"}
 little_emu = {path = "../little-emu"}
-
-# for profiling - preserve debug symbols
-[profile.release]
-debug = true

@@ -404,10 +404,9 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 	fn antialiased_blend(&mut self, x: f32, y: f32, color: TP);
 
 	fn line(&mut self, from: Vector2, to: Vector2, color: &TP, thickness: i32);
-	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP);
-	
-	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP);
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP);
+
+	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP, roundness: i32);
+	fn circle(&mut self, origin: Vector2, radius: i32, color: &TP);
 
 	fn triangle(&mut self, points: [Vector2; 3], color: &TP);
 	fn poly(&mut self, points: &[Vector2], color: &TP);
@@ -447,6 +446,45 @@ impl<S: Buffer> Bounded for S {
 
 	// 	x
 	// }
+}
+
+fn corners<B: Buffer + WriteBuffer, P: ToPixel<B::Format>, F: FnMut(i32, i32, P)>(mut blend: F, radius: i32, color: &P) {
+	let area = radius*radius;
+	let halfway = radius/2;
+
+	let mut offset = None;
+	fn calc_offset(x: i32, y2: i32, area: i32) -> f32 {
+		0.75 / sqrt(((x*x+y2) - area) as f32)
+	}
+
+	for y in 0..radius {
+		let y2 = y*y;
+
+		let mut last_x = true;
+		
+		for x in 0..radius {
+			if (x*x+y2) <= area {
+				blend(x, y, color.clone());
+			} else if last_x {
+				if let Some(off) = offset {
+					blend(x, y, color.clone().mult(off as f32 / 1.5));
+
+					last_x = false;
+
+					if y > halfway {
+						offset = None;
+					} else {
+						offset = Some(calc_offset(x, y2, area));
+					}
+				} else {
+					let off = calc_offset(x, y2, area);
+					blend(x, y, color.clone().mult(off as f32));
+					
+					offset = Some(off);
+				}
+			}
+		}
+	}
 }
 
 impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for S {
@@ -555,83 +593,50 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 		}
 	}
 
-	fn arc(&mut self, from: Vector2, to: Vector2, start: i32, end: i32, radius: i32, thickness: i32, color: &TP) {
+	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP, roundness: i32) {
+		fn simple_rect<B: Buffer + WriteBuffer, P: ToPixel<B::Format>>(buf: &mut B, from: Vector2, to: Vector2, color: &P) {
+			for y in from.y..to.y {
+				for x in from.x..to.x {
+					buf.blend(x, y, color.clone());
+				}
+			}
+		}
+		
+		if roundness > 0 {
+			let tl = from + roundness;
+			let br = to - roundness;
 
+			let bl = vec2(tl.x, br.y);
+			let tr = vec2(br.x, tl.y);
+
+			corners::<Self, TP, _>(|x, y, color| {
+				self.blend(tl.x-x-1, tl.y-y-1, color.clone());
+				self.blend(tr.x+x, tr.y-y-1, color.clone());
+				self.blend(bl.x-x-1, bl.y+y, color.clone());
+				self.blend(br.x+x, br.y+y, color);
+			}, roundness, color);
+			
+			//vertical
+			simple_rect(self, vec2(tl.x, from.y), tr, color);
+			simple_rect(self, bl, vec2(br.x, to.y), color);
+			//horiziontal
+			simple_rect(self, vec2(from.x, tl.y), bl, color);
+			simple_rect(self, tr, vec2(to.x, br.y), color);
+			//middle
+			simple_rect(self, tl, br, color);
+		} else {
+			simple_rect(self, from, to, color);
+		}
+		
 	}
 
-	fn rect(&mut self, from: Vector2, to: Vector2, color: &TP) {
-		for y in from.y..to.y {
-			for x in from.x..to.x {
-				self.blend(x, y, color.clone());
-			}
-		}
-	}
-
-	fn ellipse(&mut self, origin: Vector2, width: i32, height: i32, color: &TP) {
-		let mut wx: i32;
-		let mut wy: i32;
-		let mut xa: i32;
-		let mut ya: i32;
-		
-		let asq: i32 =  width * width;
-		let bsq: i32 = height * height;
-
-		self.blend(origin.x, origin.y + height, color.clone());
-		self.blend(origin.x, origin.y - height, color.clone());
-
-		wx = 0;
-		wy = height;
-		xa = 0;
-		ya = asq * 2 * height;
-		
-		let mut thresh: i32 = asq / 4 - asq * origin.y;
-
-		loop {
-			thresh += xa + bsq;
-
-			if thresh >= 0 {
-				ya -= asq*2;
-				thresh -= ya;
-				wy -= 1;
-			}
-
-			xa += bsq * 2;
-			wx += 1;
-
-			if xa >= ya {
-				break;
-			}
-
-			self.blend(width+wx, height-wy, color.clone());
-			self.blend(width-wx, height-wy, color.clone());
-			self.blend(width+wx, height+wy, color.clone());
-			self.blend(width-wx, height+wy, color.clone());
-		}
-
-		self.blend(origin.x+width, origin.y, color.clone());
-		self.blend(origin.x-width, origin.y, color.clone());
-
-		loop {
-			thresh += ya + asq;
-
-			if thresh >= 0 {
-				xa -= bsq*2;
-				thresh -= xa;
-				wx -= 1;
-			}
-
-			ya += asq * 2;
-			wy += 1;
-
-			if ya >= xa {
-				break;
-			}
-
-			self.blend(width+wx, height-wy, color.clone());
-			self.blend(width-wx, height-wy, color.clone());
-			self.blend(width+wx, height+wy, color.clone());
-			self.blend(width-wx, height+wy, color.clone());
-		}
+	fn circle(&mut self, origin: Vector2, radius: i32, color: &TP) {
+		corners::<Self, TP, _>(|x, y, color| {
+			self.blend(origin.x-x-1, origin.y-y-1, color.clone());
+			self.blend(origin.x-x-1, origin.y+y, color.clone());
+			self.blend(origin.x+x, origin.y-y-1, color.clone());
+			self.blend(origin.x+x, origin.y+y, color);
+		}, radius, color);
 	}
 
 	fn triangle(&mut self, mut points: [Vector2; 3], color: &TP) {

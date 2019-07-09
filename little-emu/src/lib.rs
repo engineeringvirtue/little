@@ -87,7 +87,7 @@ impl Buffer for TextureSurface {
 impl WriteBuffer for TextureSurface {
 	fn set_pixel(&mut self, x: i32, y: i32, color: RGB) {
 		if x < 0 || y < 0 || x >= self.width() || y >= self.width() {
-			panic!("Pixel ({}, {}) is out of bounds (width: {}, height: {})");
+			panic!("Pixel ({}, {}) is out of bounds (width: {}, height: {})", x, y, self.width(), self.height());
 		}
 
 		let pos = ((y * self.w * 3) + (x * 3)) as usize;
