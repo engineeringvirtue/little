@@ -144,7 +144,7 @@ impl<F: Pixel> Buffer for StaticBuffer<F> {
 
 #[macro_export]
 macro_rules! include_buffer {
-	($name: ident, $format: tt, $path: tt) => {
+	($name: ident, $format: path, $path: tt) => {
 		const $name: little::drawing::StaticBuffer<$format> =
 			little::drawing::StaticBuffer {
 				buf: include_bytes!($path),
@@ -155,7 +155,7 @@ macro_rules! include_buffer {
 
 #[macro_export]
 macro_rules! create_buffer {
-	($name: ident, $width: tt, $height: tt, $format: tt) => {
+	($name: ident, $width: tt, $height: tt, $format: path) => {
 		struct $name {
 			data: [$format; $width * $height]
 		}
@@ -333,9 +333,9 @@ fn blend_multiply<P: Pixel, SP: Pixel, Source: FnOnce() -> SP>(color: P, p: Sour
 	color.mult(t)
 }
 
-pub struct DrawRegion<'a, 'b, T> {
+pub struct DrawRegion<'a, T> {
 	pub draw: &'a mut T,
-	pub region: &'b Region
+	pub region: &'a Region
 }
 
 pub struct DrawColor<'a, P: Pixel, T> {
@@ -343,7 +343,12 @@ pub struct DrawColor<'a, P: Pixel, T> {
 	pub fill: &'a P
 }
 
-impl<'a, 'b, P: Pixel, T: Buffer<Format=P>> Buffer for DrawRegion<'a, 'b, T> {
+pub struct DrawMask<'a, B: Buffer, T> {
+	pub draw: &'a mut T,
+	pub mask: &'a B
+}
+
+impl<'a, P: Pixel, T: Buffer<Format=P>> Buffer for DrawRegion<'a, T> {
 	type Format = P;
 
 	fn width(&self) -> i32 {
@@ -359,17 +364,17 @@ impl<'a, 'b, P: Pixel, T: Buffer<Format=P>> Buffer for DrawRegion<'a, 'b, T> {
 	}
 }
 
-impl<'a, 'b, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawRegion<'a, 'b, T> {
+impl<'a, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawRegion<'a, T> {
 	fn set_pixel(&mut self, x: i32, y: i32, p: P) {
-		let (x, y) = (self.region.from.x + x, self.region.from.y + y);
+		let x = vec2(self.region.from.x + x, self.region.from.y + y);
 		//scissor
-		if x < self.region.to.x || y < self.region.to.y {
-			self.draw.set_pixel(x, y, p);
+		if self.inside(x) {
+			self.draw.set_pixel(x.x, x.y, p);
 		}
 	}
 }
 
-impl<'a, 'b, 'c, P: Pixel, SP: Pixel, T: Buffer<Format=SP>> Buffer for DrawColor<'a, P, T> {
+impl<'a, P: Pixel, SP: Pixel, T: Buffer<Format=SP>> Buffer for DrawColor<'a, P, T> {
 	type Format = P;
 
 	fn width(&self) -> i32 {
@@ -385,15 +390,38 @@ impl<'a, 'b, 'c, P: Pixel, SP: Pixel, T: Buffer<Format=SP>> Buffer for DrawColor
 	}
 }
 
-impl<'a, 'b, 'c, P: ToPixel<SP>, SP: Pixel, T: Buffer<Format=SP> + WriteBuffer> WriteBuffer for DrawColor<'a, P, T> {
+impl<'a, P: ToPixel<SP>, SP: Pixel, T: Buffer<Format=SP> + WriteBuffer> WriteBuffer for DrawColor<'a, P, T> {
 	fn set_pixel(&mut self, x: i32, y: i32, p: P) {
 		self.draw.set_pixel(x, y, blend_multiply(self.fill.clone(), move || p).to_pixel());
 	}
 }
 
+impl<'a, B: Buffer, P: Pixel, T: Buffer<Format=P>> Buffer for DrawMask<'a, B, T> {
+	type Format = P;
+
+	fn width(&self) -> i32 {
+		self.draw.width()
+	}
+
+	fn height(&self) -> i32 {
+		self.draw.height()
+	}
+
+	fn get_pixel(&self, x: i32, y: i32) -> P {
+		blend_multiply(self.draw.get_pixel(x, y), || self.mask.get_pixel(x, y))
+	}
+}
+
+impl<'a, B: Buffer, P: Pixel, T: Buffer<Format=P> + WriteBuffer> WriteBuffer for DrawMask<'a, B, T> {
+	fn set_pixel(&mut self, x: i32, y: i32, p: P) {
+		self.draw.set_pixel(x, y, blend_multiply(p, || self.mask.get_pixel(x, y)));
+	}
+}
+
 pub trait DrawingConvert: Sized {
-	fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self>;
-	fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self>;
+	fn with_region<'a>(&'a mut self, region: &'a Region) -> DrawRegion<'a, Self>;
+	fn with_color<'a, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self>;
+	fn with_mask<'a, B: Buffer>(&'a mut self, mask: &'a B) -> DrawMask<'a, B, Self>;
 }
 
 pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
@@ -421,12 +449,16 @@ pub trait Drawing<P: Pixel, TP: ToPixel<P>> {
 }
 
 impl<S: Buffer + Sized> DrawingConvert for S {
-	fn with_region<'a, 'b>(&'a mut self, region: &'b Region) -> DrawRegion<'a, 'b, Self> {
+	fn with_region<'a>(&'a mut self, region: &'a Region) -> DrawRegion<'a, Self> {
 		DrawRegion { region, draw: self }
 	}
 
-	fn with_color<'a, 'b, 'c, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self> {
+	fn with_color<'a, C: Pixel>(&'a mut self, fill: &'a C) -> DrawColor<'a, C, Self> {
 		DrawColor { fill, draw: self }
+	}
+	
+	fn with_mask<'a, B: Buffer>(&'a mut self, mask: &'a B) -> DrawMask<'a, B, Self> {
+		DrawMask { mask, draw: self }
 	}
 }
 
@@ -735,7 +767,7 @@ impl<S: Buffer + WriteBuffer, TP: ToPixel<S::Format>> Drawing<S::Format, TP> for
 	fn copy_transform<B: Buffer<Format=TP>>(&mut self, pos: Vector2, scale: Vector2f, origin: Vector2, angle: f32, buf: &B) {
 		for x in 0..self.width() {
 			for y in 0..self.height() {
-				let (fx, fy) = ((x - pos.x + origin.x) as f32, (y - pos.x + origin.y) as f32);
+				let (fx, fy) = ((x - pos.x + origin.x) as f32 / scale.x, (y - pos.x + origin.y) as f32 / scale.y);
 
 				let rx = cos(angle)*fx - sin(angle)*fy;
  				let ry = sin(angle)*fx + cos(angle)*fy;

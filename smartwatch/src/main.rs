@@ -1,40 +1,34 @@
+#![no_main]
+#![no_std]
+
+#![feature(core_intrinsics)]
+
 extern crate little;
-extern crate little_emu;
 
-mod model;
+extern crate cortex_m;
+extern crate cortex_m_rt;
+extern crate cortex_m_semihosting;
 
-use little::*;
-use little::io::*;
-use little::drawing::{RGB, RGBA, Drawing, DrawText, FontBuffer, CharBuffer};
-use little::{deg, vec2};
+// mod platform;
 
-include_buffer!(RAINY, RGBA, "../assets/rainy.rc");
-include_buffer!(EHEHE, RGBA, "../assets/ehehe.rc");
-include_font!(QUESTRIAL, "../assets/Questrial/Questrial-Regular.rc");
+use cortex_m_rt::entry;
+use cortex_m_semihosting::hprintln;
 
-fn main() {
-	let mut platform = little_emu::OpenGLPlatform::init();
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+	let _ = hprintln!("{}", info);
+	unsafe { core::intrinsics::abort() }
+}
 
-	let surface = platform.surface();
+struct CoreData {
+	weather: u8,
+	date: u16,
+	hour: u8,
+	minute: u8
+}
 
-	let questrial = QUESTRIAL;
-	let rainy = RAINY;
-
-	surface.rect(vec2(0,0), vec2(128,128), &RGB(0, 0, 0), 0);
-	surface.copy_transform(vec2(20,20), vec2f(1.0, 1.0), vec2(10, 10), deg(180.0), &rainy);
-
-	// platform.discover();
-
-	loop {
-		if platform.connected() {
-			if let Some((size, x)) = platform.recieve() {
-				let s = String::from_utf8_lossy(&x[0..size]);
-				println!("RECIEVED: {}", s);
-			}
-		}
-
-		if platform.step() {
-			break;
-		}
-	}
+#[entry]
+fn main() -> ! {
+	hprintln!("hewwo wurld").unwrap();
+	loop {}
 }

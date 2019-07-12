@@ -144,11 +144,11 @@ impl_math!(Vector2f, x, y);
 impl_math_single!(Vector2, i32, x, y);
 impl_math_single!(Vector2f, f32, x, y);
 
-pub fn vec2(x: i32, y: i32) -> Vector2 {
+pub const fn vec2(x: i32, y: i32) -> Vector2 {
 	Vector2 {x, y}
 }
 
-pub fn vec2f(x: f32, y: f32) -> Vector2f {
+pub const fn vec2f(x: f32, y: f32) -> Vector2f {
 	Vector2f {x, y}
 }
 

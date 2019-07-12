@@ -1,0 +1,104 @@
+EESchema Schematic File Version 4
+EELAYER 29 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+Text Label 4900 6700 0    50   ~ 0
+D+
+Text Label 4900 6600 0    50   ~ 0
+D-
+$Comp
+L Device:Battery_Cell BT?
+U 1 1 5D26FA15
+P 1750 2000
+F 0 "BT?" H 1632 2004 50  0000 R CNN
+F 1 "Battery_Cell" H 1632 2095 50  0000 R CNN
+F 2 "" V 1750 2060 50  0001 C CNN
+F 3 "~" V 1750 2060 50  0001 C CNN
+	1    1750 2000
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	1750 1900 1750 1550
+Wire Wire Line
+	1750 1150 3700 1150
+Wire Wire Line
+	3700 1150 3700 1400
+$Comp
+L power:VCC #PWR?
+U 1 1 5D271584
+P 1750 1150
+F 0 "#PWR?" H 1750 1000 50  0001 C CNN
+F 1 "VCC" H 1767 1323 50  0000 C CNN
+F 2 "" H 1750 1150 50  0001 C CNN
+F 3 "" H 1750 1150 50  0001 C CNN
+	1    1750 1150
+	1    0    0    -1  
+$EndComp
+Connection ~ 1750 1150
+$Comp
+L Connector:USB_B_Micro J?
+U 1 1 5D268F33
+P 950 2800
+F 0 "J?" V 1053 3130 50  0000 L CNN
+F 1 "USB_B_Micro" V 962 3130 50  0000 L CNN
+F 2 "Connector_USB:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal" H 1100 2750 50  0001 C CNN
+F 3 "~" H 1100 2750 50  0001 C CNN
+	1    950  2800
+	0    -1   -1   0   
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 5D270EB0
+P 1750 3150
+F 0 "#PWR?" H 1750 2900 50  0001 C CNN
+F 1 "GND" V 1755 3022 50  0000 R CNN
+F 2 "" H 1750 3150 50  0001 C CNN
+F 3 "" H 1750 3150 50  0001 C CNN
+	1    1750 3150
+	0    1    1    0   
+$EndComp
+Connection ~ 1750 1900
+Wire Wire Line
+	1750 1900 1750 2200
+Connection ~ 1750 2200
+Wire Wire Line
+	1750 2200 1750 2800
+Text Label 950  2500 1    50   ~ 0
+D+
+Text Label 1050 2500 1    50   ~ 0
+D-
+$Comp
+L MCU_Nordic:nRF52840 U?
+U 1 1 5D266D72
+P 3600 4200
+F 0 "U?" H 3600 1311 50  0000 C CNN
+F 1 "nRF52840" H 3600 1220 50  0000 C CNN
+F 2 "Package_DFN_QFN:Nordic_AQFN-73-1EP_7x7mm_P0.5mm" H 3600 1300 50  0001 C CNN
+F 3 "http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.nrf52/dita/nrf52/chips/nrf52840.html" H 2950 6100 50  0001 C CNN
+	1    3600 4200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1750 2800 1350 2800
+Connection ~ 1750 2800
+Wire Wire Line
+	1750 2800 1750 3150
+Wire Wire Line
+	1750 1550 750  1550
+Wire Wire Line
+	750  1550 750  2500
+Connection ~ 1750 1550
+Wire Wire Line
+	1750 1550 1750 1150
+$EndSCHEMATC

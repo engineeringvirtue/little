@@ -1,0 +1,314 @@
+EESchema Schematic File Version 4
+LIBS:pcb-cache
+EELAYER 29 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title "little smartwatch"
+Date "2019-07-11"
+Rev "1"
+Comp "engineeringvirtue"
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+Text Label 7050 6600 0    50   ~ 0
+D+
+Text Label 7050 6500 0    50   ~ 0
+D-
+Text Label 1050 2500 1    50   ~ 0
+D+
+Text Label 1150 2500 1    50   ~ 0
+D-
+Wire Wire Line
+	3950 2200 3950 3400
+Text Label 7050 1800 0    50   ~ 0
+CHRG
+Connection ~ 1700 3400
+Text Label 2200 2350 2    50   ~ 0
+CHRG
+$Comp
+L Device:CP C1
+U 1 1 5D295C6C
+P 1700 2200
+F 0 "C1" H 1818 2246 50  0000 L CNN
+F 1 "10uf" H 1818 2155 50  0000 L CNN
+F 2 "Capacitor_SMD:CP_Elec_6.3x5.4_Nichicon" H 1738 2050 50  0001 C CNN
+F 3 "~" H 1700 2200 50  0001 C CNN
+	1    1700 2200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	1700 2350 1700 3400
+$Comp
+L power:GND #PWR01
+U 1 1 5D270EB0
+P 1000 3400
+F 0 "#PWR01" H 1000 3150 50  0001 C CNN
+F 1 "GND" V 1005 3272 50  0000 R CNN
+F 2 "" H 1000 3400 50  0001 C CNN
+F 3 "" H 1000 3400 50  0001 C CNN
+	1    1000 3400
+	1    0    0    -1  
+$EndComp
+NoConn ~ 7050 4900
+NoConn ~ 7050 5000
+NoConn ~ 7050 5100
+NoConn ~ 7050 5200
+NoConn ~ 7050 2800
+NoConn ~ 7050 5300
+NoConn ~ 7050 2700
+NoConn ~ 7050 5400
+NoConn ~ 7050 5700
+NoConn ~ 7050 5500
+NoConn ~ 7050 5600
+NoConn ~ 5350 1300
+NoConn ~ 7050 2400
+NoConn ~ 7050 2300
+NoConn ~ 7050 2500
+NoConn ~ 7050 2200
+NoConn ~ 7050 2100
+NoConn ~ 7050 2600
+NoConn ~ 7050 2000
+NoConn ~ 4450 2300
+NoConn ~ 7050 4200
+NoConn ~ 7050 4100
+NoConn ~ 7050 1700
+NoConn ~ 5450 1300
+NoConn ~ 5150 1300
+NoConn ~ 7050 1600
+NoConn ~ 4950 1300
+NoConn ~ 7050 4500
+NoConn ~ 5250 1300
+NoConn ~ 6150 1300
+NoConn ~ 4450 3900
+NoConn ~ 7050 5900
+NoConn ~ 7050 6000
+NoConn ~ 7050 6200
+NoConn ~ 7050 1900
+NoConn ~ 7050 4300
+NoConn ~ 7050 2900
+NoConn ~ 7050 4800
+NoConn ~ 7050 3900
+NoConn ~ 5950 1300
+NoConn ~ 7050 3700
+NoConn ~ 7050 3500
+NoConn ~ 7050 3300
+NoConn ~ 7050 3100
+NoConn ~ 7050 3000
+NoConn ~ 5550 1300
+NoConn ~ 4450 6000
+NoConn ~ 7050 4000
+NoConn ~ 7050 3800
+NoConn ~ 7050 3600
+NoConn ~ 7050 3400
+NoConn ~ 4450 5800
+NoConn ~ 7050 3200
+NoConn ~ 6250 1300
+NoConn ~ 4450 5900
+NoConn ~ 7050 4600
+NoConn ~ 4450 4300
+NoConn ~ 7050 5800
+NoConn ~ 5050 1300
+NoConn ~ 7050 6100
+NoConn ~ 7050 6300
+NoConn ~ 7050 4400
+$Comp
+L MCU_Nordic:nRF52840 U2
+U 1 1 5D266D72
+P 5750 4100
+F 0 "U2" H 5750 1211 50  0000 C CNN
+F 1 "nRF52840" H 5750 1120 50  0000 C CNN
+F 2 "Package_DFN_QFN:Nordic_AQFN-73-1EP_7x7mm_P0.5mm" H 5750 1200 50  0001 C CNN
+F 3 "http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.nrf52/dita/nrf52/chips/nrf52840.html" H 5100 6000 50  0001 C CNN
+	1    5750 4100
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4250 3400 3950 3400
+Wire Wire Line
+	4250 3150 4250 3400
+$Comp
+L Device:R R3
+U 1 1 5D3003DE
+P 4250 3000
+F 0 "R3" H 4320 3046 50  0000 L CNN
+F 1 "100K" H 4320 2955 50  0000 L CNN
+F 2 "Resistor_SMD:R_2010_5025Metric_Pad1.52x2.65mm_HandSolder" H 4320 2909 50  0001 L CNN
+F 3 "~" H 4250 3000 50  0001 C CNN
+	1    4250 3000
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5750 1300 5750 1150
+Wire Wire Line
+	4250 1150 4250 2850
+Wire Wire Line
+	1000 3400 1550 3400
+NoConn ~ 1450 2900
+NoConn ~ 1250 2500
+Wire Wire Line
+	850  2500 850  2050
+$Comp
+L Connector:USB_B_Micro J1
+U 1 1 5D268F33
+P 1050 2800
+F 0 "J1" V 1153 3130 50  0000 L CNN
+F 1 "USB_B_Micro" V 1062 3130 50  0000 L CNN
+F 2 "Connector_USB:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal" H 1200 2750 50  0001 C CNN
+F 3 "~" H 1200 2750 50  0001 C CNN
+	1    1050 2800
+	0    -1   -1   0   
+$EndComp
+$Comp
+L power:GND #PWR0101
+U 1 1 5D32A832
+P 5750 6900
+F 0 "#PWR0101" H 5750 6650 50  0001 C CNN
+F 1 "GND" V 5755 6772 50  0000 R CNN
+F 2 "" H 5750 6900 50  0001 C CNN
+F 3 "" H 5750 6900 50  0001 C CNN
+	1    5750 6900
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR0102
+U 1 1 5D32B0EA
+P 5850 6900
+F 0 "#PWR0102" H 5850 6650 50  0001 C CNN
+F 1 "GND" V 5855 6772 50  0000 R CNN
+F 2 "" H 5850 6900 50  0001 C CNN
+F 3 "" H 5850 6900 50  0001 C CNN
+	1    5850 6900
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4400 1150 4250 1150
+Wire Wire Line
+	5750 1150 4400 1150
+Connection ~ 4400 1150
+$Comp
+L power:PWR_FLAG #FLG0102
+U 1 1 5D32C6B0
+P 4400 1150
+F 0 "#FLG0102" H 4400 1225 50  0001 C CNN
+F 1 "PWR_FLAG" V 4400 1278 50  0000 L CNN
+F 2 "" H 4400 1150 50  0001 C CNN
+F 3 "~" H 4400 1150 50  0001 C CNN
+	1    4400 1150
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	1450 2800 1550 2800
+Wire Wire Line
+	1550 2800 1550 3400
+Connection ~ 1550 3400
+Wire Wire Line
+	1550 3400 1700 3400
+Wire Wire Line
+	1700 3400 2050 3400
+Connection ~ 2600 3400
+Connection ~ 3950 3400
+Wire Wire Line
+	850  2050 1700 2050
+Connection ~ 1700 2050
+Wire Wire Line
+	1700 2050 2600 2050
+Wire Wire Line
+	2600 2750 2600 3400
+$Comp
+L Device:Battery_Cell BT1
+U 1 1 5D26FA15
+P 3000 2000
+F 0 "BT1" H 2882 2004 50  0000 R CNN
+F 1 "RJD3048ST1" H 2882 2095 50  0000 R CNN
+F 2 "Battery:Battery_Illinois_Capacitor_RJD3048ST1" V 3000 2060 50  0001 C CNN
+F 3 "~" V 3000 2060 50  0001 C CNN
+	1    3000 2000
+	-1   0    0    1   
+$EndComp
+$Comp
+L Battery_Management:LTC4054L-4.2 U1
+U 1 1 5D3385A6
+P 2600 2350
+F 0 "U1" H 3044 2346 50  0000 L CNN
+F 1 "LTC4054L-4.2" H 3044 2255 50  0000 L CNN
+F 2 "Package_TO_SOT_SMD:TSOT-23-5" H 2600 1850 50  0001 C CNN
+F 3 "https://www.analog.com/media/en/technical-documentation/data-sheets/4054l42fa.pdf" H 2600 2250 50  0001 C CNN
+	1    2600 2350
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:PWR_FLAG #FLG0101
+U 1 1 5D312F89
+P 3000 1900
+F 0 "#FLG0101" H 3000 1975 50  0001 C CNN
+F 1 "PWR_FLAG" V 3000 2027 50  0000 L CNN
+F 2 "" H 3000 1900 50  0001 C CNN
+F 3 "~" H 3000 1900 50  0001 C CNN
+	1    3000 1900
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Device:CP C2
+U 1 1 5D2A3631
+P 3950 2050
+F 0 "C2" H 4068 2096 50  0000 L CNN
+F 1 "10uf" H 4068 2005 50  0000 L CNN
+F 2 "Capacitor_SMD:CP_Elec_6.3x5.4_Nichicon" H 3988 1900 50  0001 C CNN
+F 3 "~" H 3950 2050 50  0001 C CNN
+	1    3950 2050
+	1    0    0    -1  
+$EndComp
+Connection ~ 3000 1900
+Wire Wire Line
+	3000 2350 3000 2200
+Wire Wire Line
+	2600 3400 3950 3400
+$Comp
+L power:VCC #PWR0103
+U 1 1 5D361280
+P 5850 1300
+F 0 "#PWR0103" H 5850 1150 50  0001 C CNN
+F 1 "VCC" H 5867 1473 50  0000 C CNN
+F 2 "" H 5850 1300 50  0001 C CNN
+F 3 "" H 5850 1300 50  0001 C CNN
+	1    5850 1300
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R1
+U 1 1 5D361A7E
+P 2050 2900
+F 0 "R1" H 2120 2946 50  0000 L CNN
+F 1 "1k" H 2120 2855 50  0000 L CNN
+F 2 "" V 1980 2900 50  0001 C CNN
+F 3 "~" H 2050 2900 50  0001 C CNN
+	1    2050 2900
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2200 2450 2050 2450
+Wire Wire Line
+	2050 2450 2050 2750
+Wire Wire Line
+	2050 3050 2050 3400
+Connection ~ 2050 3400
+Wire Wire Line
+	2050 3400 2600 3400
+Wire Wire Line
+	3000 1900 3950 1900
+$Comp
+L power:VCC #PWR02
+U 1 1 5D271584
+P 3000 1900
+F 0 "#PWR02" H 3000 1750 50  0001 C CNN
+F 1 "VCC" H 3017 2073 50  0000 C CNN
+F 2 "" H 3000 1900 50  0001 C CNN
+F 3 "" H 3000 1900 50  0001 C CNN
+	1    3000 1900
+	1    0    0    -1  
+$EndComp
+$EndSCHEMATC

@@ -7,7 +7,6 @@ pub enum TouchGesture {
 	ScrollX(Vector2, i32)
 }
 
-
 #[derive(Clone, Debug)]
 pub struct TouchInputState {
 	pub start: Option<Vector2>,

@@ -12,6 +12,12 @@
 			"problemMatcher": [
 				"$rustc"
 			]
+		},
+		{
+			"label": "QEMU",
+			"type": "shell",
+			"command": "qemu-system-arm -machine lm3s6965evb -cpu cortex-m4 -semihosting-config enable=on,target=native -nographic -kernel ./target/thumbv7em-none-eabihf/release/smartwatch",
+			"problemMatcher": []
 		}
 	]
 }
